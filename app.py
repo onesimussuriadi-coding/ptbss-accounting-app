@@ -22,12 +22,12 @@ if 'master_coa' not in st.session_state:
     ])
 
 if 'master_bu' not in st.session_state:
-    st.session_state.master_bu = [
-        "BU-01 - Operasional Kantor Pusat",
-        "BU-02 - Proyek Senoro-Toili (JOB Pertamina-Medco)",
-        "BU-03 - Sektor Logistik & Heavy Equipment",
-        "BU-04 - Gudang & Pengadaan Umum"
-    ]
+    st.session_state.master_bu = pd.DataFrame([
+        {"ID BU": "BU-01", "Nama Business Unit": "Operasional Kantor Pusat"},
+        {"ID BU": "BU-02", "Nama Business Unit": "Proyek Senoro-Toili (JOB Pertamina-Medco)"},
+        {"ID BU": "BU-03", "Nama Business Unit": "Sektor Logistik & Heavy Equipment"},
+        {"ID BU": "BU-04", "Nama Business Unit": "Gudang & Pengadaan Umum"}
+    ])
 
 if 'data_operasional' not in st.session_state:
     st.session_state.data_operasional = pd.DataFrame(columns=[
@@ -63,50 +63,118 @@ if menu == "Dashboard Utama":
     col1.metric("Total Dokumen Masuk", f"{total_dok} Item")
     col2.metric("Total Jurnal Tercatat", f"{total_jurnal} Baris")
     col3.metric("Total Nilai Transaksi", f"Rp {total_nilai:,.0f}")
-    col4.metric("Status Sistem", "Online & Aman")
+    col4.metric("Status Sistem", "Offline Mode (Lokal)")
     
     st.info("Gunakan menu navigasi di sebelah kiri untuk mengakses Modul 0 (Pengaturan), Modul 1 (Input), Modul 2 (Jurnal), hingga Modul 3 (Laporan).")
 
-# --- 2. MODUL 0: PENGATURAN MASTER AKUN & BUSINESS UNIT ---
+# --- 2. MODUL 0: PENGATURAN MASTER AKUN & BUSINESS UNIT (DENGAN TOMBOL LENGKAP) ---
 elif menu == "Modul 0: Pengaturan Master Akun & BU":
-    st.subheader("Modul 0: Pengaturan Chart of Accounts (COA) & Business Unit")
+    st.subheader("Modul 0: Pengaturan Master Akun (COA) & Business Unit")
     
     tab1, tab2 = st.tabs(["Master Kode Rekening (COA)", "Master Business Unit"])
     
     with tab1:
-        st.write("Daftar akun rekening yang digunakan sebagai dasar penjurnalan dan alokasi:")
+        st.markdown("### Daftar Kode Rekening (COA)")
         st.dataframe(st.session_state.master_coa, use_container_width=True)
         
-        with st.form("tambah_akun_form"):
-            st.markdown("### Tambah Akun Baru")
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                kode_baru = st.text_input("Kode Akun (Contoh: 61300)")
-            with col_b:
-                nama_baru = st.text_input("Nama Akun (Contoh: Biaya Listrik & Air)")
-            with col_c:
-                kat_baru = st.selectbox("Kategori", ["Aktiva Lancar", "Aktiva Tetap", "Kewajiban Lancar", "Ekuitas", "Pendapatan", "Biaya / HPP", "Biaya Operasional"])
+        st.divider()
+        st.markdown("### Kelola Data Akun (Tambah / Panggil / Update / Hapus)")
+        
+        # Pilihan Mode Aksi
+        mode_coa = st.radio("Pilih Aksi Pengelolaan Akun", ["Tambah Akun Baru", "Koreksi / Edit / Hapus Akun yang Ada"], horizontal=True)
+        
+        kategori_pilihan = ["Aktiva Lancar", "Aktiva Tetap", "Kewajiban Lancar", "Ekuitas", "Pendapatan", "Biaya / HPP", "Biaya Operasional"]
+        
+        if mode_coa == "Tambah Akun Baru":
+            with st.form("form_tambah_akun"):
+                col_1, col_2, col_3 = st.columns(3)
+                with col_1:
+                    kode_baru = st.text_input("Kode Akun (Contoh: 61300)")
+                with col_2:
+                    nama_baru = st.text_input("Nama Akun (Contoh: Biaya Listrik)")
+                with col_3:
+                    kat_baru = st.selectbox("Kategori", kategori_pilihan)
+                
+                btn_save = st.form_submit_button("💾 Save (Simpan Baru)")
+                if btn_save and kode_baru and nama_baru:
+                    if kode_baru in st.session_state.master_coa['Kode Akun'].values:
+                        st.error(f"Kode Akun {kode_baru} sudah ada!")
+                    else:
+                        df_b = pd.DataFrame([{"Kode Akun": kode_baru, "Nama Akun": nama_baru, "Kategori": kat_baru}])
+                        st.session_state.master_coa = pd.concat([st.session_state.master_coa, df_b], ignore_index=True)
+                        st.success(f"Akun {kode_baru} berhasil disimpan!")
+                        st.rerun()
+        
+        else: # Mode Edit / Delete
+            pilih_kode_edit = st.selectbox("Pilih Kode Akun untuk Dipanggil Ulang", st.session_state.master_coa['Kode Akun'].tolist())
             
-            submit_akun = st.form_submit_button("💾 Simpan Akun Baru")
-            if submit_akun and kode_baru and nama_baru:
-                df_baru = pd.DataFrame([{"Kode Akun": kode_baru, "Nama Akun": nama_baru, "Kategori": kat_baru}])
-                st.session_state.master_coa = pd.concat([st.session_state.master_coa, df_baru], ignore_index=True)
-                st.success(f"Akun {kode_baru} - {nama_baru} berhasil ditambahkan!")
-                st.rerun()
+            if pilih_kode_edit:
+                data_akun_pilih = st.session_state.master_coa[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit].iloc[0]
+                
+                with st.form("form_edit_akun"):
+                    ed_nama = st.text_input("Nama Akun", value=data_akun_pilih['Nama Akun'])
+                    ed_kat = st.selectbox("Kategori", kategori_pilihan, index=kategori_pilihan.index(data_akun_pilih['Kategori']) if data_akun_pilih['Kategori'] in kategori_pilihan else 0)
+                    
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        btn_update = st.form_submit_button("🔄 Update (Perbarui Data)")
+                    with col_e2:
+                        btn_delete = st.form_submit_button("🗑️ Delete (Hapus Akun)")
+                        
+                    if btn_update:
+                        st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, 'Nama Akun'] = ed_nama
+                        st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, 'Kategori'] = ed_kat
+                        st.success(f"Akun {pilih_kode_edit} berhasil diperbarui!")
+                        st.rerun()
+                        
+                    if btn_delete:
+                        st.session_state.master_coa = st.session_state.master_coa[st.session_state.master_coa['Kode Akun'] != pilih_kode_edit]
+                        st.success(f"Akun {pilih_kode_edit} berhasil dihapus!")
+                        st.rerun()
 
     with tab2:
-        st.write("Daftar Business Unit perusahaan:")
-        for bu in st.session_state.master_bu:
-            st.text(f"• {bu}")
-            
-        with st.form("tambah_bu_form"):
-            st.markdown("### Tambah Business Unit Baru")
-            bu_baru = st.text_input("Nama Business Unit (Contoh: BU-05 - Proyek Baru)")
-            submit_bu = st.form_submit_button("💾 Simpan Business Unit")
-            if submit_bu and bu_baru:
-                st.session_state.master_bu.append(bu_baru)
-                st.success(f"Business unit '{bu_baru}' berhasil ditambahkan!")
-                st.rerun()
+        st.markdown("### Daftar Business Unit")
+        st.dataframe(st.session_state.master_bu, use_container_width=True)
+        
+        st.divider()
+        st.markdown("### Kelola Business Unit (Tambah / Update / Hapus)")
+        
+        mode_bu = st.radio("Pilih Aksi Business Unit", ["Tambah BU Baru", "Koreksi / Edit / Hapus BU yang Ada"], horizontal=True)
+        
+        if mode_bu == "Tambah BU Baru":
+            with st.form("form_tambah_bu"):
+                id_bu_baru = st.text_input("ID Business Unit (Contoh: BU-05)")
+                nama_bu_baru = st.text_input("Nama Business Unit (Contoh: Proyek Tambang X)")
+                
+                btn_save_bu = st.form_submit_button("💾 Save (Simpan BU)")
+                if btn_save_bu and id_bu_baru and nama_bu_baru:
+                    df_bu_b = pd.DataFrame([{"ID BU": id_bu_baru, "Nama Business Unit": nama_bu_baru}])
+                    st.session_state.master_bu = pd.concat([st.session_state.master_bu, df_bu_b], ignore_index=True)
+                    st.success(f"Business Unit {id_bu_baru} berhasil disimpan!")
+                    st.rerun()
+        else:
+            pilih_id_bu = st.selectbox("Pilih ID Business Unit untuk Dipanggil Ulang", st.session_state.master_bu['ID BU'].tolist())
+            if pilih_id_bu:
+                data_bu_pilih = st.session_state.master_bu[st.session_state.master_bu['ID BU'] == pilih_id_bu].iloc[0]
+                
+                with st.form("form_edit_bu"):
+                    ed_nama_bu = st.text_input("Nama Business Unit", value=data_bu_pilih['Nama Business Unit'])
+                    
+                    col_bu1, col_bu2 = st.columns(2)
+                    with col_bu1:
+                        btn_update_bu = st.form_submit_button("🔄 Update (Perbarui BU)")
+                    with col_bu2:
+                        btn_delete_bu = st.form_submit_button("🗑️ Delete (Hapus BU)")
+                        
+                    if btn_update_bu:
+                        st.session_state.master_bu.loc[st.session_state.master_bu['ID BU'] == pilih_id_bu, 'Nama Business Unit'] = ed_nama_bu
+                        st.success(f"Business Unit {pilih_id_bu} berhasil diperbarui!")
+                        st.rerun()
+                        
+                    if btn_delete_bu:
+                        st.session_state.master_bu = st.session_state.master_bu[st.session_state.master_bu['ID BU'] != pilih_id_bu]
+                        st.success(f"Business Unit {pilih_id_bu} berhasil dihapus!")
+                        st.rerun()
 
 # --- 3. MODUL 1: INPUT DOKUMEN OPERASIONAL ---
 elif menu == "Modul 1: Input Dokumen Operasional":
@@ -122,6 +190,8 @@ elif menu == "Modul 1: Input Dokumen Operasional":
         "Memorial / Koreksi"
     ])
     
+    list_bu_opt = st.session_state.master_bu['ID BU'] + " - " + st.session_state.master_bu['Nama Business Unit']
+
     st.divider()
 
     with st.form("form_modul1_input"):
@@ -140,7 +210,7 @@ elif menu == "Modul 1: Input Dokumen Operasional":
         with col_input:
             tgl = st.date_input("Tanggal", datetime.now(), label_visibility="collapsed")
             no_bukti = st.text_input("No Bukti", placeholder="Contoh: BSS/KK/VIII/2026/001", label_visibility="collapsed")
-            bu_pilihan = st.selectbox("Business Unit", st.session_state.master_bu, label_visibility="collapsed")
+            bu_pilihan = st.selectbox("Business Unit", list_bu_opt, label_visibility="collapsed")
             jumlah = st.number_input("Jumlah", min_value=0.0, step=1.0, value=1.0, label_visibility="collapsed")
             satuan = st.text_input("Satuan", placeholder="Contoh: Unit, Liter, Pcs, Lot, Jam", label_visibility="collapsed")
             peruntukan = st.text_input("Peruntukan", placeholder="Contoh: Unit Vacuum Truck", label_visibility="collapsed")
@@ -202,7 +272,7 @@ elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
             with col_j1:
                 akun_debit = st.selectbox("Pilih Akun DEBIT", list_akun_opt)
             with col_j2:
-                akun_kredit = st.selectbox("Pilih Akun KREDIT", list_akun_opt, index=1)
+                akun_kredit = st.selectbox("Pilih Akun KREDIT", list_akun_opt, index=1 if len(list_akun_opt) > 1 else 0)
                 
             nominal_jurnal = st.number_input("Nominal Jurnal (Rp)", value=float(dok_terpilih['Nilai Uang']), step=1000.0)
             
@@ -225,7 +295,6 @@ elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
                     st.session_state.data_jurnal, pd.DataFrame([baris_d, baris_k])
                 ], ignore_index=True)
                 
-                # Ubah status dokumen
                 st.session_state.data_operasional.loc[st.session_state.data_operasional['ID'] == id_pilih, 'Status Jurnal'] = 'Sudah Dijurnal'
                 st.success(f"Jurnal untuk dokumen {dok_terpilih['Nomor Bukti']} berhasil diposting!")
                 st.rerun()
