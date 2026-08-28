@@ -275,7 +275,7 @@ elif menu == "Modul 3: Output Laporan Keuangan":
             
         with tab_buku:
             st.markdown("### Buku Besar Per Akun (General Ledger)")
-            pilih_ akun_gl = st.selectbox("Pilih Akun", df_jrn['Kode Akun'] + " - " + df_jrn['Nama Akun'])
+            pilih_akun_gl = st.selectbox("Pilih Akun", df_jrn['Kode Akun'] + " - " + df_jrn['Nama Akun'])
             if pilih_akun_gl:
                 kode_gl = pilih_akun_gl.split(" - ")[0]
                 df_gl_filtered = df_jrn[df_jrn['Kode Akun'] == kode_gl]
