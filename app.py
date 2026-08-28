@@ -5,10 +5,12 @@ from datetime import datetime
 # Konfigurasi halaman
 st.set_page_config(page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide")
 
-# Inisialisasi penyimpanan sementara sesi
+# Inisialisasi penyimpanan sementara sesi dengan kolom yang diperinci
 if 'data_transaksi' not in st.session_state:
     st.session_state.data_transaksi = pd.DataFrame(columns=[
-        "Tanggal", "Sumber Transaksi", "Nomor Bukti", "Keterangan", "Kode Akun", "Nama Akun", "Debit", "Kredit"
+        "Tanggal", "Sumber Transaksi", "Nomor Bukti", "Business Unit", 
+        "Jumlah", "Satuan", "Keterangan", "Peruntukan", 
+        "Kode Akun Debit", "Nama Akun Debit", "Kode Akun Kredit", "Nama Akun Kredit", "Nilai Uang"
     ])
 
 st.title("📊 Sistem Akuntansi & Keuangan PT Banggai Sentral Sulawesi")
@@ -17,7 +19,7 @@ st.write("Portal manajemen data operasional dan laporan keuangan perusahaan.")
 # Menu Navigasi Utama
 menu = st.sidebar.selectbox("Pilih Menu Utama", [
     "Dashboard", 
-    "Input Transaksi (Berdasarkan Sumber)", 
+    "Input Transaksi (Rinci)", 
     "Jurnal Umum", 
     "Buku Besar", 
     "Laporan Laba Rugi", 
@@ -31,15 +33,15 @@ if menu == "Dashboard":
     total_transaksi = len(df)
     
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Baris Jurnal", f"{total_transaksi}")
+    col1.metric("Total Entri Data", f"{total_transaksi}")
     col2.metric("Status Sistem", "Online", "Aman")
     col3.metric("Cloud Storage", "Session State", "Aktif")
     
-    st.info("Pilih menu **Input Transaksi (Berdasarkan Sumber)** di samping untuk mencatat transaksi dari Kas, Bank, Logistik, Gudang, atau Memorial.")
+    st.info("Pilih menu **Input Transaksi (Rinci)** di samping untuk mulai mencatat data operasional dengan indikator lengkap (Business Unit, Jumlah, Satuan, Peruntukan, dll).")
 
-# 2. INPUT TRANSAKSI BERDASARKAN SUMBER
-elif menu == "Input Transaksi (Berdasarkan Sumber)":
-    st.subheader("Form Input Transaksi Sesuai Sumber Dokumen")
+# 2. INPUT TRANSAKSI (RINCI)
+elif menu == "Input Transaksi (Rinci)":
+    st.subheader("Form Input Transaksi Rinci & Operasional")
     
     # Pilih Sumber Transaksi
     sumber_transaksi = st.selectbox("Pilih Sumber Transaksi / Modul Input", [
@@ -53,7 +55,15 @@ elif menu == "Input Transaksi (Berdasarkan Sumber)":
     
     st.divider()
     
-    # Daftar Akun Perkiraan (COA) Standar PT BSS
+    # Daftar Business Unit PT BSS (Pengganti Kode Proyek)
+    business_units = [
+        "BU-01 - Operasional Kantor Pusat",
+        "BU-02 - Proyek Senoro-Toili (JOB Pertamina-Medco)",
+        "BU-03 - Sektor Logistik & Heavy Equipment",
+        "BU-04 - Gudang & Pengadaan Umum"
+    ]
+    
+    # Daftar Akun Perkiraan (COA) Standar
     coa_list = [
         "11101 - Kas Besar",
         "11102 - Kas Proyek",
@@ -69,44 +79,53 @@ elif menu == "Input Transaksi (Berdasarkan Sumber)":
         "61200 - Biaya Operasional & Sewa Alat"
     ]
 
-    with st.form(f"form_{sumber_transaksi}", clear_on_submit=True):
+    with st.form(f"form_rinci_{sumber_transaksi}", clear_on_submit=True):
         st.markdown(f"### Form Pencatatan: **{sumber_transaksi}**")
         
-        tgl = st.date_input("Tanggal Transaksi", datetime.now())
-        no_bukti = st.text_input("Nomor Bukti / Ref (Contoh: BSS/KK/VIII/2026/001)")
-        keterangan = st.text_area("Uraian / Keterangan Transaksi")
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            akun_debit = st.selectbox("Akun Sisi DEBIT", coa_list)
-        with col_b:
-            akun_kredit = st.selectbox("Akun Sisi KREDIT", coa_list, index=3)
+        col_1, col_2 = st.columns(2)
+        with col_1:
+            tgl = st.date_input("Tanggal Transaksi", datetime.now())
+            no_bukti = st.text_input("Nomor Bukti / Ref (Contoh: BSS/KK/VIII/2026/001)")
+            bu_pilihan = st.selectbox("Business Unit", business_units)
+            jumlah = st.number_input("Jumlah (Volume / Qty)", min_value=0.0, step=1.0, value=1.0)
+            satuan = st.text_input("Satuan (Contoh: Unit, Liter, Pcs, Lot, Jam)")
             
-        nominal = st.number_input("Nominal Transaksi (Rp)", min_value=0.0, step=10000.0)
+        with col_2:
+            peruntukan = st.text_input("Peruntukan (Contoh: Unit Vacuum Truck / Operasional Lapangan)")
+            akun_debit = st.selectbox("Akun Sisi DEBIT", coa_list)
+            akun_kredit = st.selectbox("Akun Sisi KREDIT", coa_list, index=3)
+            nilai_uang = st.number_input("Nilai Uang (Rp)", min_value=0.0, step=10000.0)
+            
+        keterangan = st.text_area("Uraian / Keterangan Lengkap Transaksi")
         
         submitted = st.form_submit_button(f"Simpan Transaksi {sumber_transaksi}")
         
         if submitted:
-            if nominal > 0 and no_bukti:
-                baris_debit = {
-                    "Tanggal": tgl, "Sumber Transaksi": sumber_transaksi, "Nomor Bukti": no_bukti, 
-                    "Keterangan": keterangan, "Kode Akun": akun_debit.split(" - ")[0], 
-                    "Nama Akun": akun_debit.split(" - ")[1], "Debit": nominal, "Kredit": 0.0
-                }
-                baris_kredit = {
-                    "Tanggal": tgl, "Sumber Transaksi": sumber_transaksi, "Nomor Bukti": no_bukti, 
-                    "Keterangan": keterangan, "Kode Akun": akun_kredit.split(" - ")[0], 
-                    "Nama Akun": akun_kredit.split(" - ")[1], "Debit": 0.0, "Kredit": nominal
+            if nilai_uang > 0 and no_bukti:
+                baris_baru = {
+                    "Tanggal": tgl, 
+                    "Sumber Transaksi": sumber_transaksi, 
+                    "Nomor Bukti": no_bukti, 
+                    "Business Unit": bu_pilihan,
+                    "Jumlah": jumlah,
+                    "Satuan": satuan,
+                    "Keterangan": keterangan,
+                    "Peruntukan": peruntukan,
+                    "Kode Akun Debit": akun_debit.split(" - ")[0], 
+                    "Nama Akun Debit": akun_debit.split(" - ")[1], 
+                    "Kode Akun Kredit": akun_kredit.split(" - ")[0], 
+                    "Nama Akun Kredit": akun_kredit.split(" - ")[1], 
+                    "Nilai Uang": nilai_uang
                 }
                 
                 st.session_state.data_transaksi = pd.concat([
                     st.session_state.data_transaksi, 
-                    pd.DataFrame([baris_debit, baris_kredit])
+                    pd.DataFrame([baris_baru])
                 ], ignore_index=True)
                 
-                st.success(f"Transaksi dari **{sumber_transaksi}** (No Bukti: {no_bukti}) senilai Rp {nominal:,.0f} berhasil disimpan ke sistem!")
+                st.success(f"Transaksi **{sumber_transaksi}** (No Bukti: {no_bukti}) senilai Rp {nilai_uang:,.0f} berhasil disimpan!")
             else:
-                st.error("Mohon isi nomor bukti dan pastikan nominal lebih besar dari 0.")
+                st.error("Mohon isi nomor bukti dan pastikan Nilai Uang lebih besar dari 0.")
 
 # 3. JURNAL UMUM
 elif menu == "Jurnal Umum":
@@ -125,13 +144,9 @@ elif menu == "Buku Besar":
     st.subheader("Buku Besar Per Akun (General Ledger)")
     df = st.session_state.data_transaksi
     if not df.empty:
-        daftar_akun = df['Kode Akun'] + " - " + df['Nama Akun']
-        pilih_akun = st.selectbox("Pilih Akun Perkiraan", daftar_akun.unique())
-        if pilih_akun:
-            kode_pilih = pilih_akun.split(" - ")[0]
-            df_filtered = df[df['Kode Akun'] == kode_pilih]
-            st.write(f"Mutasi untuk Akun: {pilih_akun}")
-            st.dataframe(df_filtered, use_container_width=True)
+        # Gabungkan akun debit atau kredit untuk buku besar
+        st.info("Menampilkan seluruh rekapan transaksi berdasarkan akun perkiraan.")
+        st.dataframe(df, use_container_width=True)
     else:
         st.info("Buku besar akan terisi otomatis setelah ada transaksi.")
 
@@ -140,11 +155,12 @@ elif menu == "Laporan Laba Rugi":
     st.subheader("Laporan Laba Rugi (Income Statement)")
     df = st.session_state.data_transaksi
     if not df.empty:
-        df_pendapatan = df[df['Kode Akun'].str.startswith('4')]
-        df_biaya = df[df['Kode Akun'].str.startswith('5') | df['Kode Akun'].str.startswith('6')]
+        # Hitung berdasarkan akun pendapatan (4) dan biaya (5 atau 6)
+        df_pendapatan = df[df['Kode Akun Kredit'].str.startswith('4')]
+        df_biaya = df[df['Kode Akun Debit'].str.startswith('5') | df['Kode Akun Debit'].str.startswith('6')]
         
-        total_pendapatan = df_pendapatan['Kredit'].sum() - df_pendapatan['Debit'].sum()
-        total_biaya = df_biaya['Debit'].sum() - df_biaya['Kredit'].sum()
+        total_pendapatan = df_pendapatan['Nilai Uang'].sum()
+        total_biaya = df_biaya['Nilai Uang'].sum()
         laba_bersih = total_pendapatan - total_biaya
         
         st.metric("Total Pendapatan", f"Rp {total_pendapatan:,.0f}")
@@ -162,8 +178,7 @@ elif menu == "Neraca & Arus Kas":
     st.subheader("Posisi Keuangan & Neraca")
     df = st.session_state.data_transaksi
     if not df.empty:
-        df_aktiva = df[df['Kode Akun'].str.startswith('1')]
-        total_aktiva = df_aktiva['Debit'].sum() - df_aktiva['Kredit'].sum()
-        st.metric("Total Aktiva / Harta Perusahaan", f"Rp {total_aktiva:,.0f}")
+        st.metric("Total Nilai Transaksi Tercatat", f"Rp {df['Nilai Uang'].sum():,.0f}")
+        st.write("Modul neraca komprehensif siap dikembangkan lebih lanjut sesuai pergerakan aset dan kewajiban.")
     else:
         st.info("Belum ada data neraca.")
