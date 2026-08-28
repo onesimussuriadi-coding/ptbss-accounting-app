@@ -6,29 +6,38 @@ from datetime import datetime
 st.set_page_config(page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide")
 
 # 1. INISIALISASI SESSION STATE (Master Akun 6 Digit Sesuai Draf PDF Anda)
-if 'master_coa' not in st.session_state:
+if 'master_coa' not in st.session_state or 'Sub Kategori' not in st.session_state.master_coa.columns:
     st.session_state.master_coa = pd.DataFrame([
-        # Kategori Aset & Pendapatan (Contoh penyesuaian 6 digit)
+        # Kategori Aset & Pendapatan
         {"Kode Akun": "111001", "Nama Akun": "Kas Besar", "Sub Account": "Kas & Setara Kas", "Sub Kategori": "110000 - Kas Utama", "Kategori": "100000 - Aset Lancar"},
         {"Kode Akun": "111002", "Nama Akun": "Kas Proyek", "Sub Account": "Kas & Setara Kas", "Sub Kategori": "110000 - Kas Utama", "Kategori": "100000 - Aset Lancar"},
         {"Kode Akun": "112001", "Nama Akun": "Bank Utama (Operasional)", "Sub Account": "Perbankan", "Sub Kategori": "110000 - Kas Utama", "Kategori": "100000 - Aset Lancar"},
         {"Kode Akun": "410001", "Nama Akun": "Pendapatan Kontrak / Jasa", "Sub Account": "Pendapatan Usaha", "Sub Kategori": "410000 - Pendapatan Proyek", "Kategori": "400000 - Pendapatan"},
         
         # Sesuai Draf PDF: Proyek Sewa Alat
-        {"Kode Akun": "511101", "Nama Akun": "Gaji Karyawan", "Sub Account": "511000 - Upah Langsung", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "511102", "Nama Akun": "Upah Harian", "Sub Account": "511000 - Upah Langsung", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "511103", "Nama Akun": "Upah Borongan", "Sub Account": "511000 - Upah Langsung", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "511201", "Nama Akun": "Keahlian / Skill", "Sub Account": "511200 - Tunjangan-tunjangan", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "511202", "Nama Akun": "Konsumsi", "Sub Account": "511200 - Tunjangan-tunjangan", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "511203", "Nama Akun": "Transport Proyek", "Sub Account": "511200 - Tunjangan-tunjangan", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "512101", "Nama Akun": "Perlengkapan Office", "Sub Account": "512000 - Supplies", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "512102", "Nama Akun": "Perlengkapan Alat Berat", "Sub Account": "512000 - Supplies", "Sub Kategori": "510000 - Proyek Sewa Alat", "Kategori": "500000 - Biaya Proyek"},
+        {"Kode Akun": "511101", "Nama Akun": "GAJI KARYAWAN", "Sub Account": "511000 - UPAH LANGSUNG", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511102", "Nama Akun": "UPAH HARIAN", "Sub Account": "511000 - UPAH LANGSUNG", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511103", "Nama Akun": "UPAH BORONGAN", "Sub Account": "511000 - UPAH LANGSUNG", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511201", "Nama Akun": "KEAHLIAN/SKILL", "Sub Account": "511200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511202", "Nama Akun": "KONSUMSI", "Sub Account": "511200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511203", "Nama Akun": "TRANSPORT PROYEK", "Sub Account": "511200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511204", "Nama Akun": "BPJS", "Sub Account": "511200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "511205", "Nama Akun": "PENGOBATAN", "Sub Account": "511200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "512101", "Nama Akun": "PERLENGKAPAN OFFICE", "Sub Account": "512000 - SUPPLIES", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "512102", "Nama Akun": "PERLENGKAPAN ALAT BERAT", "Sub Account": "512000 - SUPPLIES", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "512103", "Nama Akun": "PERLENGKAPAN KENDARAAN", "Sub Account": "512000 - SUPPLIES", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"},
         
         # Sesuai Draf PDF: Drilling
-        {"Kode Akun": "521101", "Nama Akun": "Gaji Karyawan", "Sub Account": "521000 - Upah Langsung", "Sub Kategori": "520000 - Drilling", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "521102", "Nama Akun": "Upah Harian", "Sub Account": "521000 - Upah Langsung", "Sub Kategori": "520000 - Drilling", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "521201", "Nama Akun": "Keahlian / Skill", "Sub Account": "521200 - Tunjangan-tunjangan", "Sub Kategori": "520000 - Drilling", "Kategori": "500000 - Biaya Proyek"},
-        {"Kode Akun": "522101", "Nama Akun": "Perlengkapan Office", "Sub Account": "522000 - Supplies", "Sub Kategori": "520000 - Drilling", "Kategori": "500000 - Biaya Proyek"}
+        {"Kode Akun": "521101", "Nama Akun": "GAJI KARYAWAN", "Sub Account": "521000 - UPAH LANGSUNG", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "521102", "Nama Akun": "UPAH HARIAN", "Sub Account": "521000 - UPAH LANGSUNG", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "521103", "Nama Akun": "UPAH BORONGAN", "Sub Account": "521000 - UPAH LANGSUNG", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "521201", "Nama Akun": "KEAHLIAN/SKILL", "Sub Account": "521200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "521202", "Nama Akun": "KONSUMSI", "Sub Account": "521200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "522101", "Nama Akun": "PERLENGKAPAN OFFICE", "Sub Account": "522000 - SUPPLIES", "Sub Kategori": "520000 - DRILLING", "Kategori": "500000 BIAYA PROYEK"},
+        
+        # Sesuai Draf PDF: Well Services
+        {"Kode Akun": "521101", "Nama Akun": "GAJI KARYAWAN", "Sub Account": "521000 - UPAH LANGSUNG", "Sub Kategori": "520000 - WELL SERVICES", "Kategori": "500000 BIAYA PROYEK"},
+        {"Kode Akun": "521201", "Nama Akun": "KEAHLIAN/SKILL", "Sub Account": "521200 - TUNJANGAN-TUNJANGAN", "Sub Kategori": "520000 - WELL SERVICES", "Kategori": "500000 BIAYA PROYEK"}
     ])
 
 if 'master_bu' not in st.session_state:
@@ -84,7 +93,7 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
     tab1, tab2 = st.tabs(["Master Kode Rekening (6 Digit)", "Master Business Unit"])
     
     with tab1:
-        st.markdown("### Daftar Kode Rekening (Urutan: Kategori -> Sub Kategori -> Sub Account -> Nama Akun -> Kode Akun)")
+        st.markdown("### Daftar Kode Rekening (Urutan: Kategori -> Sub Kategori -> Sub Account -> Nama Account -> Kode Akun)")
         
         # Urutan kolom dari Kanan ke Kiri sesuai permintaan
         df_tampil_coa = st.session_state.master_coa[["Kategori", "Sub Kategori", "Sub Account", "Nama Akun", "Kode Akun"]]
@@ -97,7 +106,7 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
         
         kategori_pilihan = [
             "100000 - Aset Lancar", "200000 - Kewajiban", "300000 - Ekuitas", 
-            "400000 - Pendapatan", "500000 - Biaya Proyek"
+            "400000 - Pendapatan", "500000 BIAYA PROYEK"
         ]
         
         if mode_coa == "Tambah Akun Baru":
@@ -106,11 +115,11 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
                 with col_1:
                     kat_baru = st.selectbox("Kategori", kategori_pilihan)
                 with col_2:
-                    subkat_baru = st.text_input("Sub Kategori (Contoh: 510000 - Proyek Sewa Alat)")
+                    subkat_baru = st.text_input("Sub Kategori (Contoh: 510000 - PROYEK SEWA ALAT)")
                 with col_3:
-                    subacc_baru = st.text_input("Sub Account (Contoh: 511000 - Upah Langsung)")
+                    subacc_baru = st.text_input("Sub Account (Contoh: 511000 - UPAH LANGSUNG)")
                 with col_4:
-                    nama_baru = st.text_input("Nama Account (Contoh: Upah Lembur)")
+                    nama_baru = st.text_input("Nama Account (Contoh: UPAH LEMBUR)")
                 with col_5:
                     kode_baru = st.text_input("Kode Akun (6 Digit, Cth: 511104)")
                 
