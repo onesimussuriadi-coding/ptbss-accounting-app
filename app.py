@@ -5,20 +5,19 @@ from datetime import datetime
 # Konfigurasi halaman
 st.set_page_config(page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide")
 
-# 1. INISIALISASI SESSION STATE (Master Akun, Business Unit, dan Data Transaksi)
+# 1. INISIALISASI SESSION STATE (Master Akun Bertingkat Sesuai Contoh Anda)
 if 'master_coa' not in st.session_state:
     st.session_state.master_coa = pd.DataFrame([
-        {"Kode Akun": "11101", "Nama Akun": "Kas Besar", "Kategori": "Aktiva Lancar"},
-        {"Kode Akun": "11102", "Nama Akun": "Kas Proyek", "Kategori": "Aktiva Lancar"},
-        {"Kode Akun": "11103", "Nama Akun": "Kas Kecil (Petty Cash)", "Kategori": "Aktiva Lancar"},
-        {"Kode Akun": "11200", "Nama Akun": "Bank Utama (Operasional)", "Kategori": "Aktiva Lancar"},
-        {"Kode Akun": "11300", "Nama Akun": "Piutang Usaha", "Kategori": "Aktiva Lancar"},
-        {"Kode Akun": "21100", "Nama Akun": "Hutang Usaha", "Kategori": "Kewajiban Lancar"},
-        {"Kode Akun": "31100", "Nama Akun": "Modal Disetor", "Kategori": "Ekuitas"},
-        {"Kode Akun": "41100", "Nama Akun": "Pendapatan Kontrak / Jasa", "Kategori": "Pendapatan"},
-        {"Kode Akun": "51100", "Nama Akun": "Pembelian Material / Logistik", "Kategori": "Biaya / HPP"},
-        {"Kode Akun": "61100", "Nama Akun": "Biaya Gaji Karyawan", "Kategori": "Biaya Operasional"},
-        {"Kode Akun": "61200", "Nama Akun": "Biaya Sewa Alat & Operasional", "Kategori": "Biaya Operasional"}
+        {"Kode Akun": "11101", "Nama Akun": "Kas Besar", "Kategori": "Aktiva Lancar", "Subkategori": "Kas & Setara Kas"},
+        {"Kode Akun": "11102", "Nama Akun": "Kas Proyek", "Kategori": "Aktiva Lancar", "Subkategori": "Kas & Setara Kas"},
+        {"Kode Akun": "11103", "Nama Akun": "Kas Kecil (Petty Cash)", "Kategori": "Aktiva Lancar", "Subkategori": "Kas & Setara Kas"},
+        {"Kode Akun": "11200", "Nama Akun": "Bank Utama (Operasional)", "Kategori": "Aktiva Lancar", "Subkategori": "Bank"},
+        # Contoh Kategori Biaya Proyek Anda
+        {"Kode Akun": "51201", "Nama Akun": "Gaji Karyawan", "Kategori": "51000 - Biaya Proyek", "Subkategori": "51200 - Proyek Sewa Alat"},
+        {"Kode Akun": "51202", "Nama Akun": "Tunjangan Uang Makan", "Kategori": "51000 - Biaya Proyek", "Subkategori": "51200 - Proyek Sewa Alat"},
+        {"Kode Akun": "51301", "Nama Akun": "Gaji Karyawan", "Kategori": "51000 - Biaya Proyek", "Subkategori": "51300 - Proyek Drilling"},
+        {"Kode Akun": "51302", "Nama Akun": "Uang Makan", "Kategori": "51000 - Biaya Proyek", "Subkategori": "51300 - Proyek Drilling"},
+        {"Kode Akun": "41100", "Nama Akun": "Pendapatan Kontrak / Jasa", "Kategori": "40000 - Pendapatan", "Subkategori": "41000 - Pendapatan Usaha"}
     ])
 
 if 'master_bu' not in st.session_state:
@@ -41,7 +40,7 @@ if 'data_jurnal' not in st.session_state:
     ])
 
 st.title("📊 Sistem Akuntansi Terintegrasi PT Banggai Sentral Sulawesi")
-st.write("Dashboard Pengelolaan Keuangan Berbasis Modul Terstruktur.")
+st.write("Dashboard Pengelolaan Keuangan Berbasis Kategori, Subkategori, & Akun Bertingkat.")
 
 # Menu Navigasi Sidebar Sesuai Struktur Modul
 menu = st.sidebar.selectbox("Pilih Menu / Modul Utama", [
@@ -65,47 +64,53 @@ if menu == "Dashboard Utama":
     col3.metric("Total Nilai Transaksi", f"Rp {total_nilai:,.0f}")
     col4.metric("Status Sistem", "Offline Mode (Lokal)")
     
-    st.info("Gunakan menu navigasi di sebelah kiri untuk mengakses Modul 0 (Pengaturan), Modul 1 (Input), Modul 2 (Jurnal), hingga Modul 3 (Laporan).")
+    st.info("Gunakan menu navigasi di sebelah kiri untuk mengakses Modul 0 (Pengaturan Akun Bertingkat), Modul 1, 2, dan 3.")
 
-# --- 2. MODUL 0: PENGATURAN MASTER AKUN & BUSINESS UNIT (DENGAN TOMBOL LENGKAP) ---
+# --- 2. MODUL 0: PENGATURAN MASTER AKUN BERTINGKAT & BU ---
 elif menu == "Modul 0: Pengaturan Master Akun & BU":
-    st.subheader("Modul 0: Pengaturan Master Akun (COA) & Business Unit")
+    st.subheader("Modul 0: Pengaturan Kategori, Subkategori, & Kode Rekening (COA)")
     
-    tab1, tab2 = st.tabs(["Master Kode Rekening (COA)", "Master Business Unit"])
+    tab1, tab2 = st.tabs(["Master Kode Rekening (Bertingkat)", "Master Business Unit"])
     
     with tab1:
-        st.markdown("### Daftar Kode Rekening (COA)")
+        st.markdown("### Daftar Kode Rekening (Kategori -> Subkategori -> Akun)")
         st.dataframe(st.session_state.master_coa, use_container_width=True)
         
         st.divider()
-        st.markdown("### Kelola Data Akun (Tambah / Panggil / Update / Hapus)")
+        st.markdown("### Kelola Data Akun (Save / Panggil Ulang / Update / Delete)")
         
-        # Pilihan Mode Aksi
         mode_coa = st.radio("Pilih Aksi Pengelolaan Akun", ["Tambah Akun Baru", "Koreksi / Edit / Hapus Akun yang Ada"], horizontal=True)
         
-        kategori_pilihan = ["Aktiva Lancar", "Aktiva Tetap", "Kewajiban Lancar", "Ekuitas", "Pendapatan", "Biaya / HPP", "Biaya Operasional"]
+        kategori_pilihan = ["Aktiva Lancar", "Aktiva Tetap", "Kewajiban Lancar", "Ekuitas", "40000 - Pendapatan", "51000 - Biaya Proyek", "61000 - Biaya Operasional"]
         
         if mode_coa == "Tambah Akun Baru":
             with st.form("form_tambah_akun"):
-                col_1, col_2, col_3 = st.columns(3)
+                col_1, col_2, col_3, col_4 = st.columns(4)
                 with col_1:
-                    kode_baru = st.text_input("Kode Akun (Contoh: 61300)")
+                    kode_baru = st.text_input("Kode Akun (Contoh: 51203)")
                 with col_2:
-                    nama_baru = st.text_input("Nama Akun (Contoh: Biaya Listrik)")
+                    nama_baru = st.text_input("Nama Akun (Contoh: Transport Lokal)")
                 with col_3:
-                    kat_baru = st.selectbox("Kategori", kategori_pilihan)
+                    kat_baru = st.selectbox("Kategori Utama", kategori_pilihan)
+                with col_4:
+                    subkat_baru = st.text_input("Subkategori (Contoh: 51200 - Proyek Sewa Alat)")
                 
                 btn_save = st.form_submit_button("💾 Save (Simpan Baru)")
                 if btn_save and kode_baru and nama_baru:
                     if kode_baru in st.session_state.master_coa['Kode Akun'].values:
                         st.error(f"Kode Akun {kode_baru} sudah ada!")
                     else:
-                        df_b = pd.DataFrame([{"Kode Akun": kode_baru, "Nama Akun": nama_baru, "Kategori": kat_baru}])
+                        df_b = pd.DataFrame([{
+                            "Kode Akun": kode_baru, 
+                            "Nama Akun": nama_baru, 
+                            "Kategori": kat_baru, 
+                            "Subkategori": subkat_baru
+                        }])
                         st.session_state.master_coa = pd.concat([st.session_state.master_coa, df_b], ignore_index=True)
                         st.success(f"Akun {kode_baru} berhasil disimpan!")
                         st.rerun()
         
-        else: # Mode Edit / Delete
+        else: # Mode Edit / Panggil Ulang / Delete
             pilih_kode_edit = st.selectbox("Pilih Kode Akun untuk Dipanggil Ulang", st.session_state.master_coa['Kode Akun'].tolist())
             
             if pilih_kode_edit:
@@ -113,7 +118,8 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
                 
                 with st.form("form_edit_akun"):
                     ed_nama = st.text_input("Nama Akun", value=data_akun_pilih['Nama Akun'])
-                    ed_kat = st.selectbox("Kategori", kategori_pilihan, index=kategori_pilihan.index(data_akun_pilih['Kategori']) if data_akun_pilih['Kategori'] in kategori_pilihan else 0)
+                    ed_kat = st.selectbox("Kategori Utama", kategori_pilihan, index=kategori_pilihan.index(data_akun_pilih['Kategori']) if data_akun_pilih['Kategori'] in kategori_pilihan else 0)
+                    ed_subkat = st.text_input("Subkategori", value=data_akun_pilih['Subkategori'])
                     
                     col_e1, col_e2 = st.columns(2)
                     with col_e1:
@@ -124,6 +130,7 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
                     if btn_update:
                         st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, 'Nama Akun'] = ed_nama
                         st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, 'Kategori'] = ed_kat
+                        st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, 'Subkategori'] = ed_subkat
                         st.success(f"Akun {pilih_kode_edit} berhasil diperbarui!")
                         st.rerun()
                         
@@ -137,7 +144,7 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
         st.dataframe(st.session_state.master_bu, use_container_width=True)
         
         st.divider()
-        st.markdown("### Kelola Business Unit (Tambah / Update / Hapus)")
+        st.markdown("### Kelola Business Unit (Save / Update / Delete)")
         
         mode_bu = st.radio("Pilih Aksi Business Unit", ["Tambah BU Baru", "Koreksi / Edit / Hapus BU yang Ada"], horizontal=True)
         
@@ -179,7 +186,7 @@ elif menu == "Modul 0: Pengaturan Master Akun & BU":
 # --- 3. MODUL 1: INPUT DOKUMEN OPERASIONAL ---
 elif menu == "Modul 1: Input Dokumen Operasional":
     st.subheader("Modul 1: Khusus Penginputan Dokumen Operasional Harian")
-    st.write("Staf lapangan/operasional menginput data transaksi mentah di sini tanpa memilih akun jurnal.")
+    st.write("Staf lapangan/operasional menginput data transaksi mentah di sini.")
     
     sumber_transaksi = st.selectbox("Pilih Sumber Dokumen / Modul", [
         "Kas Besar / Kas Proyek",
@@ -250,7 +257,7 @@ elif menu == "Modul 1: Input Dokumen Operasional":
 # --- 4. MODUL 2: PROSES PENJURNALAN AKUNTANSI ---
 elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
     st.subheader("Modul 2: Proses Penjurnalan oleh Bagian Akuntansi")
-    st.write("Pilih dokumen dari Modul 1 yang masuk, lalu tentukan akun Debit dan Kreditnya.")
+    st.write("Pilih dokumen dari Modul 1 yang masuk, lalu tentukan akun Debit dan Kreditnya berdasarkan subkategori proyek.")
     
     df_op = st.session_state.data_operasional
     if not df_op.empty:
@@ -265,7 +272,7 @@ elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
         
         st.info(f"Memproses Dokumen: **{dok_terpilih['Nomor Bukti']}** | Keterangan: *{dok_terpilih['Keterangan']}* | Nilai: **Rp {dok_terpilih['Nilai Uang']:,.0f}**")
         
-        list_akun_opt = st.session_state.master_coa['Kode Akun'] + " - " + st.session_state.master_coa['Nama Akun']
+        list_akun_opt = st.session_state.master_coa['Kode Akun'] + " - " + st.session_state.master_coa['Nama Akun'] + " [" + st.session_state.master_coa['Subkategori'] + "]"
         
         with st.form("form_proses_jurnal"):
             col_j1, col_j2 = st.columns(2)
