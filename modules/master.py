@@ -2,97 +2,121 @@ import streamlit as st
 import pandas as pd
 
 def render_modul_0():
-    st.subheader("Modul 0: Pengaturan Master Data Perusahaan")
+    st.subheader("Modul 0: Pengaturan Master Akun (Chart of Accounts & Business Unit)")
     
-    sub_modul = st.radio("Pilih Sub Menu Master:", ["Input Account / Kode Rekening", "Input Business Unit"], horizontal=True)
-    st.divider()
+    tab1, tab2 = st.tabs(["📁 Master Akun (COA)", "🏢 Master Business Unit (BU)"])
     
-    if sub_modul == "Input Account / Kode Rekening":
-        st.markdown("### 📋 Daftar Kode Rekening (6 Digit)")
-        df_tampil_coa = st.session_state.master_coa[["Kategori", "Sub Kategori", "Sub Account", "Nama Akun", "Kode Akun"]]
-        st.dataframe(df_tampil_coa, use_container_width=True)
+    with tab1:
+        st.markdown("### Daftar Master Akun")
+        st.write("Sistem otomatis mendeteksi Kategori 1, Kategori 2, Sub Kategori, dan Account berdasarkan awalan Nomor Akun yang Anda masukkan.")
         
-        st.divider()
-        st.markdown("### Kelola Data Akun (Auto-Fill & Manual)")
-        mode_coa = st.radio("Pilih Aksi Pengelolaan Akun", ["Tambah Akun Baru", "Koreksi / Edit / Hapus Akun yang Ada"], horizontal=True)
-        
-        if mode_coa == "Tambah Akun Baru":
-            with st.form("form_tambah_akun"):
-                st.info("💡 **Tips Auto-Fill:** Masukkan Kode Akun 6 digit (Contoh: `511103`) dan Nama Account. Kategori & Sub Kategori akan terisi otomatis!")
-                col_1, col_2 = st.columns(2)
-                with col_1:
-                    kode_baru = st.text_input("Kode Akun (6 Digit)")
-                with col_2:
-                    nama_baru = st.text_input("Nama Account")
+        # Form Input Akun Baru dengan Auto-Detection
+        with st.form("form_tambah_akun", clear_on_submit=True):
+            st.markdown("#### Tambah / Daftarkan Akun Baru")
+            c1, c2 = st.columns(2)
+            with c1:
+                input_no_akun = st.text_input("Nomor Akun (Cth: 1110.002 atau 5133.002)")
+            with c2:
+                input_nama_akun = st.text_input("Nama Account (Variabel / Bebas Diedit)")
                 
-                kat_otomatis, subkat_otomatis, subacc_otomatis = "", "", ""
-                if kode_baru and len(kode_baru) >= 1:
-                    prefix = kode_baru[0]
-                    if prefix == '1': kat_otomatis = "100000 - Aset Lancar"
-                    elif prefix == '2': kat_otomatis = "200000 - Kewajiban"
-                    elif prefix == '3': kat_otomatis = "300000 - Ekuitas"
-                    elif prefix == '4': kat_otomatis = "400000 - Pendapatan"
-                    elif prefix == '5':
-                        kat_otomatis = "500000 BIAYA PROYEK"
-                        if len(kode_baru) >= 3:
-                            sub_p = kode_baru[1:3]
-                            if sub_p == "11": subkat_otomatis = "510000 - PROYEK SEWA ALAT"
-                            elif sub_p == "21" or sub_p == "22": subkat_otomatis = "520000 - DRILLING / SERVICES"
-                            else: subkat_otomatis = f"5{sub_p}000 - PROYEK UMUM"
-                        if len(kode_baru) >= 4:
-                            subacc_p = kode_baru[:4] + "00"
-                            if kode_baru[3] == '1': subacc_otomatis = f"{subacc_p} - UPAH LANGSUNG"
-                            elif kode_baru[3] == '2': subacc_otomatis = f"{subacc_p} - TUNJANGAN-TUNJANGAN"
-                            else: subacc_otomatis = f"{subacc_p} - SUPPLIES"
+            submitted = st.form_submit_button("➕ Tambahkan ke Master Akun")
+            
+            if submitted:
+                if input_no_akun and input_nama_akun:
+                    kode_bersih = input_no_akun.strip()
+                    
+                    # --- LOGIKA OTOMATIS PEMBACAAN HIERARKI DARI KODE AKUN ---
+                    kategori_1 = ""
+                    kategori_2 = ""
+                    sub_kategori = ""
+                    account_utama = ""
+                    
+                    # 1. Deteksi Kategori 1 (Digit Pertama)
+                    p1 = kode_bersih[0] if len(kode_bersih) > 0 else ""
+                    if p1 == '1': kategori_1 = "1 - Aktiva"[cite: 1]
+                    elif p1 == '2': kategori_1 = "2 - Hutang"[cite: 1]
+                    elif p1 == '3': kategori_1 = "3 - Ekuitas"[cite: 1]
+                    elif p1 == '4': kategori_1 = "4 - Pendapatan"[cite: 1]
+                    elif p1 == '5': kategori_1 = "5 - Harga Pokok Penjualan"[cite: 1]
+                    
+                    # 2. Deteksi Kategori 2 (Dua Digit Pertama)
+                    p2 = kode_bersih[:2] if len(kode_bersih) >= 2 else ""
+                    if p2 == '11': kategori_2 = "11 - Aktiva Lancar"[cite: 1]
+                    elif p2 == '12': kategori_2 = "12 - Aktiva Tetap / Lainnya"[cite: 1]
+                    elif p2 == '13': kategori_2 = "13 - Aktiva Tetap / Akumulasi"[cite: 1]
+                    elif p2 == '21': kategori_2 = "21 - Hutang Lancar"[cite: 1]
+                    elif p2 == '22': kategori_2 = "22 - Hutang Jangka Panjang"[cite: 1]
+                    elif p2 == '31': kategori_2 = "31 - Modal"[cite: 1]
+                    elif p2 == '32': kategori_2 = "32 - Laba Ditahan"[cite: 1]
+                    elif p2 == '41': kategori_2 = "41 - Pendapatan Proyek GS"[cite: 1]
+                    elif p2 == '42': kategori_2 = "42 - Pendapatan Proyek CR"[cite: 1]
+                    elif p2 == '51': kategori_2 = "51 - Harga Pokok Proyek GS"[cite: 1]
 
-                col_3, col_4, col_5 = st.columns(3)
-                with col_3: kat_baru = st.text_input("Kategori (Otomatis)", value=kat_otomatis)
-                with col_4: subkat_baru = st.text_input("Sub Kategori (Otomatis)", value=subkat_otomatis)
-                with col_5: subacc_baru = st.text_input("Sub Account (Otomatis)", value=subacc_otomatis)
-                
-                btn_save = st.form_submit_button("💾 Save (Simpan Akun)")
-                if btn_save and kode_baru and nama_baru:
-                    if kode_baru in st.session_state.master_coa['Kode Akun'].values:
-                        st.error(f"Kode Akun {kode_baru} sudah ada!")
+                    # 3. Deteksi Sub Kategori (Tiga Digit Pertama)
+                    p3 = kode_bersih[:3] if len(kode_bersih) >= 3 else ""
+                    if p3 == '111': sub_kategori = "111 - Kas"[cite: 1]
+                    elif p3 == '112': sub_kategori = "112 - Bank"[cite: 1]
+                    elif p3 == '113': sub_kategori = "113 - Investasi Jk Pendek"[cite: 1]
+                    elif p3 == '114': sub_kategori = "114 - Piutang Usaha"[cite: 1]
+                    elif p3 == '115': sub_kategori = "115 - Uang Muka Pembelian"[cite: 1]
+                    elif p3 == '116': sub_kategori = "116 - Piutang Lain"[cite: 1]
+                    elif p3 == '117': sub_kategori = "117 - Persediaan Barang"[cite: 1]
+                    elif p3 == '118': sub_kategori = "118 - Uang Muka Biaya / Pajak"[cite: 1]
+                    elif p3 == '121': sub_kategori = "121 - Investasi Jangka Panjang"[cite: 1]
+                    elif p3 == '131': sub_kategori = "131 - Harga Peroleh Aktiva Tetap"[cite: 1]
+                    elif p3 == '132': sub_kategori = "132 - Akumulasi Penyusutan"[cite: 1]
+                    elif p3 == '211': sub_kategori = "211 - Hutang Bank"[cite: 1]
+                    elif p3 == '212': sub_kategori = "212 - Hutang Usaha"[cite: 1]
+                    elif p3 == '213': sub_kategori = "213 - Pendapatan Diterima Dimuka"[cite: 1]
+                    elif p3 == '214': sub_kategori = "214 - Hutang Pajak"[cite: 1]
+                    elif p3 == '215': sub_kategori = "215 - Hutang Biaya"[cite: 1]
+                    elif p3 == '216': sub_kategori = "216 - Hutang Lain-Lain"[cite: 1]
+                    elif p3 == '221': sub_kategori = "221 - Kewajiban Jangka Panjang"[cite: 1]
+                    elif p3 == '311': sub_kategori = "311 - Modal"[cite: 1]
+                    elif p3 == '321': sub_kategori = "321 - Laba Ditahan"[cite: 1]
+                    elif p3 == '411': sub_kategori = "411 - Penjualan Barang Dagangan"[cite: 1]
+                    elif p3 == '412': sub_kategori = "412 - Pendapatan Jasa Tronton"[cite: 1]
+                    elif p3 == '413': sub_kategori = "413 - Pendapatan Proyek Jasa Umum"[cite: 1]
+                    elif p3 == '421': sub_kategori = "421 - Pendapatan Proyek Konstruksi"[cite: 1]
+                    elif p3 == '511': sub_kategori = "511 - Harga Pokok Pengadaan Barang"[cite: 1]
+                    elif p3 == '512': sub_kategori = "512 - Harga Pokok Operasional Tronton"[cite: 1]
+                    elif p3 == '513': sub_kategori = "513 - Harga Pokok Proyek Jasa Umum / Supplies"[cite: 1]
+                    elif p3 == '514': sub_kategori = "514 - Biaya Lain-Lain Proyek"[cite: 1]
+
+                    # 4. Deteksi Account Utama (Empat digit sebelum titik)
+                    if '.' in kode_bersih:
+                        account_utama = kode_bersih.split('.')[0]
                     else:
-                        df_b = pd.DataFrame([{
-                            "Kode Akun": kode_baru, "Nama Akun": nama_baru.upper(), 
-                            "Sub Account": subacc_baru, "Sub Kategori": subkat_baru, "Kategori": kat_baru
-                        }])
-                        st.session_state.master_coa = pd.concat([st.session_state.master_coa, df_b], ignore_index=True)
-                        st.success(f"Akun {kode_baru} berhasil disimpan!")
-                        st.rerun()
-        else:
-            if not st.session_state.master_coa.empty:
-                pilih_kode_edit = st.selectbox("Pilih Kode Akun untuk Dipanggil Ulang", st.session_state.master_coa['Kode Akun'].tolist())
-                if pilih_kode_edit:
-                    data_akun_pilih = st.session_state.master_coa[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit].iloc[0]
-                    with st.form("form_edit_akun"):
-                        ed_kat = st.text_input("Kategori", value=data_akun_pilih['Kategori'])
-                        ed_subkat = st.text_input("Sub Kategori", value=data_akun_pilih['Sub Kategori'])
-                        ed_subacc = st.text_input("Sub Account", value=data_akun_pilih['Sub Account'])
-                        ed_nama = st.text_input("Nama Account", value=data_akun_pilih['Nama Akun'])
-                        col_e1, col_e2 = st.columns(2)
-                        with col_e1: btn_update = st.form_submit_button("🔄 Update Akun")
-                        with col_e2: btn_delete = st.form_submit_button("🗑️ Delete Akun")
-                        if btn_update:
-                            st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_kode_edit, ['Kategori', 'Sub Kategori', 'Sub Account', 'Nama Akun']] = [ed_kat, ed_subkat, ed_subacc, ed_nama.upper()]
-                            st.success("Akun berhasil diperbarui!")
-                            st.rerun()
-                        if btn_delete:
-                            st.session_state.master_coa = st.session_state.master_coa[st.session_state.master_coa['Kode Akun'] != pilih_kode_edit]
-                            st.success("Akun berhasil dihapus!")
-                            st.rerun()
+                        account_utama = kode_bersih[:4]
 
-    else:
-        st.markdown("### 🏢 Daftar Business Unit / Proyek")
-        st.dataframe(st.session_state.master_bu, use_container_width=True)
-        with st.form("form_tambah_bu"):
-            id_bu_baru = st.text_input("ID Business Unit (Cth: BU-05)")
-            nama_bu_baru = st.text_input("Nama Business Unit (Cth: Proyek Slickline)")
-            btn_save_bu = st.form_submit_button("💾 Save Business Unit")
-            if btn_save_bu and id_bu_baru:
-                df_bu_b = pd.DataFrame([{"ID BU": id_bu_baru, "Nama Business Unit": nama_bu_baru}])
-                st.session_state.master_bu = pd.concat([st.session_state.master_bu, df_bu_b], ignore_index=True)
-                st.success("Business Unit berhasil disimpan!")
-                st.rerun()
+                    # Simpan ke DataFrame Master COA di Session State
+                    data_baru = {
+                        "Kode Akun": kode_bersih,
+                        "Nama Akun": input_nama_akun,
+                        "Sub Account": sub_kategori,
+                        "Sub Kategori": kategori_2,
+                        "Kategori": kategori_1
+                    }
+                    
+                    st.session_state.master_coa = pd.concat([
+                        st.session_state.master_coa, pd.DataFrame([data_baru])
+                    ], ignore_index=True)
+                    
+                    st.success(f"Akun **{input_no_akun} - {input_nama_akun}** berhasil ditambahkan dan dibaca otomatis oleh sistem!")
+                    st.rerun()
+                else:
+                    st.error("Mohon lengkapi Nomor Akun dan Nama Account.")
+
+        st.divider()
+        st.markdown("#### Tabel Master Akun Aktif")
+        if not st.session_state.master_coa.empty:
+            st.dataframe(st.session_state.master_coa, use_container_width=True)
+        else:
+            st.info("Belum ada data master akun.")
+
+    with tab2:
+        st.markdown("### Daftar Business Unit (BU) / Proyek")
+        if not st.session_state.master_bu.empty:
+            st.dataframe(st.session_state.master_bu, use_container_width=True)
+        else:
+            st.info("Belum ada data Business Unit.")
