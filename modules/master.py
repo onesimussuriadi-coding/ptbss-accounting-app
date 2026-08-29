@@ -176,9 +176,10 @@ def render_modul_0():
                 st.session_state.show_preview = False
                 st.rerun()
 
-            st.markdown("---")
-            st.markdown("#### 🔄 Panggil Ulang Akun untuk Diedit atau Dihapus")
-            
+        st.markdown("---")
+        st.markdown("#### 🔄 Panggil Ulang Akun untuk Diedit atau Dihapus")
+        
+        if not st.session_state.master_coa.empty:
             list_kode_akun = st.session_state.master_coa['Kode Akun'].tolist()
             pilih_akun_edit = st.selectbox("Pilih Kode Akun yang Ingin Dikoreksi", list_kode_akun)
             
@@ -207,8 +208,7 @@ def render_modul_0():
                         st.success(f"Akun **{pilih_akun_edit}** berhasil dihapus dari master!")
                         st.rerun()
         else:
-            if st.session_state.master_coa.empty:
-                st.info("Belum ada data master akun.")
+            st.info("Belum ada data master akun.")
 
         st.divider()
         # --- FORM TAMBAH AKUN BARU ---

@@ -15,11 +15,12 @@ from modules.laporan import render_modul_3
 
 st.set_page_config(page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide")
 
-# Inisialisasi Global Session State
+# --- PENGAMAN UTAMA: Mencegah data Master Akun tereset saat refresh atau update kode ---
 if 'master_coa' not in st.session_state or 'Sub Kategori' not in st.session_state.master_coa.columns:
     st.session_state.master_coa = pd.DataFrame([
-        {"Kode Akun": "410001", "Nama Akun": "PENDAPATAN USAHA", "Sub Account": "Pendapatan Jasa", "Sub Kategori": "410000 - Pendapatan Proyek", "Kategori": "400000 - Pendapatan"},
-        {"Kode Akun": "511101", "Nama Akun": "GAJI KARYAWAN", "Sub Account": "511000 - UPAH LANGSUNG", "Sub Kategori": "510000 - PROYEK SEWA ALAT", "Kategori": "500000 BIAYA PROYEK"}
+        {"Kode Akun": "1110.001", "Nama Akun": "Kas Besar Luwuk", "Sub Account": "111 - Kas", "Sub Kategori": "11 - Aktiva Lancar", "Kategori": "1 - Aktiva"},
+        {"Kode Akun": "1120.001", "Nama Akun": "BCA 0884791339 an. Vonny", "Sub Account": "112 - Bank", "Sub Kategori": "11 - Aktiva Lancar", "Kategori": "1 - Aktiva"},
+        {"Kode Akun": "5133.001", "Nama Akun": "Alat Tulis Kantor", "Sub Account": "513 - Harga Pokok Proyek Jasa Umum", "Sub Kategori": "51 - Harga Pokok Proyek GS", "Kategori": "5 - Harga Pokok Penjualan"}
     ])
 
 if 'master_bu' not in st.session_state:
@@ -33,7 +34,6 @@ if 'master_bu' not in st.session_state:
 if 'master_satuan' not in st.session_state:
     st.session_state.master_satuan = ["Unit", "Lot", "Liter", "Jam", "Pcs", "Hari", "Bulan", "Trip", "M3"]
 
-# Master Data Supplier / Vendor
 if 'master_supplier' not in st.session_state:
     st.session_state.master_supplier = [
         "- Tidak Ada / Kas Tunai -", 
@@ -78,7 +78,7 @@ if menu == "Dashboard Utama":
     col1.metric("Total Dokumen Masuk", f"{total_dok} Item")
     col2.metric("Total Jurnal Tercatat", f"{total_jurnal} Baris")
     col3.metric("Total Nilai Transaksi", f"Rp {total_nilai:,.0f}")
-    col4.metric("Status Sistem", "Modular Clean Mode")
+    col4.metric("Status Sistem", "Modular Protected Mode")
     
     st.info("Gunakan menu navigasi di sebelah kiri untuk mengakses modul terpisah.")
 
