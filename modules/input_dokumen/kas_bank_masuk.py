@@ -177,11 +177,11 @@ def render_kas_bank_masuk():
         with c2: keterangan = st.text_area("Keterangan", placeholder="Keterangan penerimaan dana kas/bank masuk...", label_visibility="collapsed", key=f"ket_kbm_{idx}")
         
         c1, c2 = st.columns([1, 2])
-        with c1: st.markdown("<br>💰 **Nominal Penerimaan (Total)**", unsafe_allow_html=True)
+        with c1: st.markdown("<br>💰 **Nomor Penerimaan (Total)**", unsafe_allow_html=True)
         with c2:
             if suggested_dpp > 0:
                 st.info(f"💡 Total tagihan invoice terpilih: **Rp {suggested_dpp:,.2f}**")
-            total_transaksi = st.number_input("Nominal", min_value=0.0, step=10000.0, format="%.2f", value=suggested_dpp, label_visibility="collapsed", key=f"val_tot_kbm_{idx}")
+            total_transaksi = st.number_input("Nomor", min_value=0.0, step=10000.0, format="%.2f", value=suggested_dpp, label_visibility="collapsed", key=f"val_tot_kbm_{idx}")
 
         st.divider()
         col_b1, col_b2 = st.columns(2)
