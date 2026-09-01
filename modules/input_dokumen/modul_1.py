@@ -1,9 +1,44 @@
 from datetime import datetime
+import json
+import os
 import pandas as pd
 import streamlit as st
 
+# File database permanen yang tersimpan di direktori lokal / sinkronisasi Google Drive
+EXCEL_DB_PATH = "database_transaksi_bss.xlsx"
+
+def load_persistent_data():
+  """Memuat data transaksi secara permanen dari file Excel."""
+  if "data_operasional" not in st.session_state:
+    if os.path.exists(EXCEL_DB_PATH):
+      try:
+        st.session_state.data_operasional = pd.read_excel(EXCEL_DB_PATH)
+      except Exception:
+        st.session_state.data_operasional = pd.DataFrame(columns=[
+            "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+            "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+            "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+            "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+        ])
+    else:
+      st.session_state.data_operasional = pd.DataFrame(columns=[
+          "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+          "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+          "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+          "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+      ])
+
+def save_persistent_data():
+  """Menyimpan data secara permanen ke file Excel."""
+  try:
+    st.session_state.data_operasional.to_excel(EXCEL_DB_PATH, index=False)
+  except Exception as e:
+    st.error(f"Gagal menyimpan ke file permanen: {e}")
 
 def render_modul_1():
+  # Pastikan data permanen dimuat di awal
+  load_persistent_data()
+
   # Inisialisasi state sesi verifikasi khusus di dalam Modul 1
   if "modul1_verified" not in st.session_state:
     st.session_state.modul1_verified = False
@@ -100,7 +135,7 @@ def render_modul_1():
               )
     return
 
-  # Jika sudah terverifikasi, tampilkan info penginput aktif & tombol ganti sesi di atas
+  # Jika sudah terverifikasi, tampilkan info penginput aktif & tombol ganti sesi
   col_info, col_out = st.columns([4, 1])
   with col_info:
     st.info(
@@ -124,118 +159,177 @@ def render_modul_1():
   from modules.input_dokumen.memorial_koreksi import render_memorial_koreksi
   from modules.input_dokumen.pembelian_kredit import render_pembelian_kredit
 
-  # Inisialisasi DataFrame utama dengan kolom pelacakan Tanggal Input & Approve
-  if "data_operasional" not in st.session_state:
-    st.session_state.data_operasional = pd.DataFrame(
-        columns=[
-            "Nomor Bukti",
-            "Tanggal Transaksi",
-            "Sumber Transaksi",
-            "Lawan Transaksi",
-            "No Invoice",
-            "Jatuh Tempo",
-            "Business Unit",
-            "Departemen Tujuan",
-            "Jumlah",
-            "Satuan",
-            "Peruntukan",
-            "Keterangan",
-            "DPP",
-            "PPN",
-            "PPH",
-            "Total",
-            "Status Dokumen",
-            "Status Jurnal",
-            "Nama Penginput",
-            "Tanggal Input",
-            "Tanggal Approve",
-        ]
-    )
-
-  # =========================================================================
-  # FITUR SIDEBAR: RUANG DATA TERSIMPAN MANDIRI & PANGGIL ULANG (EDIT)
-  # =========================================================================
   penginput_saat_ini = st.session_state.modul1_user
+  dept_saat_ini = st.session_state.modul1_dept
 
+  # =========================================================================
+  # FITUR SIDEBAR: MENU KELOLA DATA MANDIRI
+  # =========================================================================
   with st.sidebar:
     st.markdown("---")
-    st.markdown("### 📂 Data Tersimpan Anda")
+    st.markdown("### 📂 Menu Data Mandiri")
     st.markdown(
-        f"<p style='font-size:12px; color:#64748B;'>Privasi data milik:"
+        f"<p style='font-size:12px; color:#64748B;'>Pengguna:"
         f" <b>{penginput_saat_ini}</b></p>",
         unsafe_allow_html=True,
     )
 
+    menu_data_tersimpan = st.toggle("📂 Kelola / Lihat Data Tersimpan", value=False, key="toggle_kelola_data")
+
+  # =========================================================================
+  # PEMBACAAN DINAMIS AKUN KAS BERAWALAN "1110" DARI MASTER COA
+  # =========================================================================
+  list_kas_1110 = []
+  if os.path.exists("master_coa_bss.xlsx"):
+    try:
+      df_coa = pd.read_excel("master_coa_bss.xlsx")
+      df_coa.columns = df_coa.columns.str.replace("\xa0", " ").str.strip()
+      col_kode = df_coa.columns[0]
+      col_nama = (
+          df_coa.columns[1] if len(df_coa.columns) > 1 else df_coa.columns[0]
+      )
+      
+      mask_1110 = df_coa[col_kode].astype(str).str.startswith("1110")
+      df_filtered = df_coa[mask_1110]
+      
+      if not df_filtered.empty:
+        list_kas_1110 = (
+            df_filtered[col_kode].astype(str).str.strip()
+            + " - "
+            + df_filtered[col_nama].astype(str).str.strip()
+        ).tolist()
+    except Exception:
+      pass
+
+  if not list_kas_1110:
+    list_kas_1110 = [
+        "1110.001 - Kas Besar Luwuk",
+        "1110.002 - Kas Operasional Surabaya",
+        "1110.003 - Kas Operasional Jakarta",
+        "1110.012 - Kas Kecil",
+    ]
+
+  # =========================================================================
+  # JIKA TOMBOL "KELOLA DATA TERSIMPAN" DIKLIK -> DASHBOARD MANAJEMEN & DISTRIBUSI
+  # =========================================================================
+  if menu_data_tersimpan:
+    st.markdown("## 📋 Dashboard Manajemen & Distribusi Dokumen")
+    st.markdown(f"Berikut adalah daftar dokumen yang diinput oleh **{penginput_saat_ini}**. Anda dapat melakukan **Panggil Ulang (Edit/Update)**, **Hapus**, atau **Distribusi Berjenjang** ke meja Kepala Bagian.")
+    st.markdown("---")
+
     df_all_ops = st.session_state.data_operasional
-    # Filter data HANYA milik user yang sedang aktif login
     if not df_all_ops.empty and "Nama Penginput" in df_all_ops.columns:
       df_user_milik_sendiri = df_all_ops[
-          df_all_ops["Nama Penginput"].str.lower()
-          == penginput_saat_ini.lower()
+          df_all_ops["Nama Penginput"].str.lower() == penginput_saat_ini.lower()
       ]
     else:
       df_user_milik_sendiri = pd.DataFrame(columns=df_all_ops.columns)
 
-    if not df_user_milik_sendiri.empty:
-      st.dataframe(
-          df_user_milik_sendiri[
-              [
-                  "Nomor Bukti",
-                  "Sumber Transaksi",
-                  "Total",
-                  "Status Dokumen",
-                  "Tanggal Input",
-              ]
-          ],
-          use_container_width=True,
-      )
+    if df_user_milik_sendiri.empty:
+      st.info("ℹ️ Belum ada data dokumen yang tersimpan atas nama Anda.")
+    else:
+      kolom_tampil = [
+          col for col in ["Nomor Bukti", "Sumber Transaksi", "Total", "Status Dokumen", "Tanggal"]
+          if col in df_user_milik_sendiri.columns
+      ]
+      st.dataframe(df_user_milik_sendiri[kolom_tampil], use_container_width=True)
+
+      st.markdown("### 🚀 Distribusi Dokumen Berjenjang ke Kepala Bagian")
+      st.markdown("<p style='font-size:12px; color:#64748B;'>Pilih nomor bukti dokumen yang sudah diverifikasi, lalu klik tombol submit untuk menaikkan status approval ke Kepala Bagian.</p>", unsafe_allow_html=True)
+      
+      list_bukti_user = df_user_milik_sendiri["Nomor Bukti"].tolist()
+      
+      col_dis1, col_dis2 = st.columns([2, 1])
+      with col_dis1:
+        pilih_bukti_distribusi = st.selectbox(
+            "Pilih No Bukti untuk Didistribusikan", 
+            ["-- Pilih Nomor Bukti --"] + list_bukti_user,
+            key="select_distribusi_kbk"
+        )
+      with col_dis2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📤 Submit / Distribusikan ke Kabag", use_container_width=True):
+          if pilih_bukti_distribusi != "-- Pilih Nomor Bukti --":
+            mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_bukti_distribusi
+            st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Menunggu Approval Kepala Bagian {dept_saat_ini}"
+            
+            # Simpan permanen ke file Excel / Google Drive
+            save_persistent_data()
+            
+            st.success(f"Dokumen **{pilih_bukti_distribusi}** berhasil disubmit dan didistribusikan ke Kepala Bagian!")
+            st.rerun()
+          else:
+            st.warning("Pilih Nomor Bukti terlebih dahulu untuk didistribusikan.")
 
       st.markdown("---")
-      st.markdown("#### 🔄 Panggil Ulang (Edit / Update)")
-      list_bukti_user = df_user_milik_sendiri["Nomor Bukti"].tolist()
-      pilih_edit_bukti = st.selectbox(
-          "Pilih Nomor Bukti untuk Diedit", ["-- Pilih --"] + list_bukti_user
-      )
+      st.markdown("### 🛠️ Aksi Panggil Ulang (Edit) atau Hapus Dokumen")
+      
+      col_pil, col_btn_edit, col_btn_hapus = st.columns([2, 1, 1])
+      with col_pil:
+        pilih_aksi_bukti = st.selectbox("Pilih Berdasarkan Nomor Bukti untuk Edit", ["-- Pilih Nomor Bukti --"] + list_bukti_user, key="select_edit_kbk")
+      
+      with col_btn_edit:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📥 Panggil Ulang (Edit)", use_container_width=True):
+          if pilih_aksi_bukti != "-- Pilih Nomor Bukti --":
+            row_pilih = df_user_milik_sendiri[
+                df_user_milik_sendiri["Nomor Bukti"] == pilih_aksi_bukti
+            ].iloc[0]
+            st.session_state.edit_mode_active = True
+            st.session_state.edit_data_temp = row_pilih.to_dict()
+            st.success(f"Nomor Bukti **{pilih_aksi_bukti}** berhasil dimuat!")
+            st.info("💡 Matikan toggle 'Kelola / Lihat Data Tersimpan' di sidebar untuk melihat form edit.")
+          else:
+            st.warning("Pilih Nomor Bukti terlebih dahulu.")
 
-      if pilih_edit_bukti != "-- Pilih --":
-        if st.button(
-            "📥 Muat Data ke Form Edit", use_container_width=True
-        ):
-          row_pilih = df_user_milik_sendiri[
-              df_user_milik_sendiri["Nomor Bukti"] == pilih_edit_bukti
-          ].iloc[0]
-          st.session_state.edit_mode_active = True
-          st.session_state.edit_data_temp = row_pilih.to_dict()
-          st.success(
-              f"Data **{pilih_edit_bukti}** berhasil dimuat. Silakan lakukan"
-              " perubahan pada form utama."
-          )
-          st.rerun()
-    else:
-      st.info(
-          "Belum ada data tersimpan yang Anda input. Data dari pengguna lain"
-          " disembunyikan demi privasi."
-      )
+      with col_btn_hapus:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️ Hapus Dokumen", use_container_width=True):
+          if pilih_aksi_bukti != "-- Pilih Nomor Bukti --":
+            st.session_state.data_operasional = st.session_state.data_operasional[
+                st.session_state.data_operasional["Nomor Bukti"] != pilih_aksi_bukti
+            ]
+            # Simpan perubahan permanen setelah penghapusan
+            save_persistent_data()
+            st.success(f"Nomor Bukti '{pilih_aksi_bukti}' berhasil dihapus!")
+            st.rerun()
+          else:
+            st.warning("Pilih Nomor Bukti yang ingin dihapus.")
+            
+    st.markdown("---")
+    if st.button("🔙 Kembali ke Form Input Utama"):
+      if "toggle_kelola_data" in st.session_state:
+        del st.session_state.toggle_kelola_data
+      st.rerun()
+    return
 
   # =========================================================================
-  # NAVIGASI UTAMA MODUL 1
+  # NAVIGASI & PENYESUAIAN OTOMATIS SAAT MODE EDIT
   # =========================================================================
-  list_sumber_opsi = [
-      "Kas Bank Masuk (Penerimaan Dana)",
-      "Penerbitan Invoice / Tagihan Penjualan (Piutang Usaha)",
-      "Tagihan / Pembelian Kredit (Hutang Usaha)",
-      "Kas Besar / Kas Proyek",
-      "Kas Kecil (Petty Cash)",
-      "Bank Keluar / Pembayaran",
-      "Gudang",
-      "Memorial / Koreksi",
-  ]
+  role_aktif = st.session_state.get("user_role", "")
+  is_edit_mode = st.session_state.get("edit_mode_active", False)
+  edit_data = st.session_state.get("edit_data_temp", {})
 
-  if st.session_state.get("edit_mode_active", False):
+  if role_aktif == "Programmer":
+    list_sumber_opsi = list_kas_1110 + [
+        "Tagihan / Pembelian Kredit (Hutang Usaha)",
+        "Gudang",
+        "Kas Bank Masuk (Penerimaan Dana)",
+        "Penerbitan Invoice / Tagihan Penjualan (Piutang Usaha)",
+        "Memorial / Koreksi",
+    ]
+  elif dept_saat_ini == "Logistik":
+    list_sumber_opsi = list_kas_1110 + [
+        "Tagihan / Pembelian Kredit (Hutang Usaha)",
+        "Gudang",
+    ]
+  else:
+    list_sumber_opsi = list_kas_1110
+
+  if is_edit_mode:
     st.warning(
-        "⚠️ **MODE EDIT AKTIF:** Anda sedang memperbarui data dokumen dengan"
-        f" Nomor Bukti: `{st.session_state.edit_data_temp.get('Nomor Bukti')}`."
-        " Perubahan yang disimpan akan memperbarui data sebelumnya."
+        f"⚠️ **MODE EDIT AKTIF (No. Bukti: {edit_data.get('Nomor Bukti')})**: "
+        "Sumber akun disesuaikan otomatis mengikuti data yang dipanggil."
     )
     if st.button("❌ Batalkan Mode Edit"):
       st.session_state.edit_mode_active = False
@@ -243,11 +337,26 @@ def render_modul_1():
         del st.session_state.edit_data_temp
       st.rerun()
 
-  sumber_transaksi = st.selectbox(
-      "Pilih Sumber Dokumen untuk Diinput",
-      list_sumber_opsi,
-      key="selectbox_sumber_trx",
-  )
+    sumber_tercatat = edit_data.get("Sumber Transaksi", "")
+    default_idx = 0
+    for i, opt in enumerate(list_sumber_opsi):
+      if any(k in sumber_tercatat for k in opt.split(" - ")[0].split(" — ")[0].split()):
+        default_idx = i
+        break
+
+    sumber_transaksi = st.selectbox(
+        f"Pilih Sumber Dokumen / Akun Kas ({dept_saat_ini})",
+        list_sumber_opsi,
+        index=default_idx,
+        key="selectbox_sumber_trx_edit",
+    )
+  else:
+    sumber_transaksi = st.selectbox(
+        f"Pilih Sumber Dokumen / Akun Kas ({dept_saat_ini})",
+        list_sumber_opsi,
+        key="selectbox_sumber_trx_normal",
+    )
+
   st.markdown("---")
 
   # Render form input dokumen sesuai pilihan
@@ -259,11 +368,7 @@ def render_modul_1():
     render_invoice_penjualan()
   elif sumber_transaksi == "Kas Bank Masuk (Penerimaan Dana)":
     render_kas_bank_masuk()
-  elif sumber_transaksi in [
-      "Kas Besar / Kas Proyek",
-      "Kas Kecil (Petty Cash)",
-      "Bank Keluar / Pembayaran",
-  ]:
+  elif sumber_transaksi in list_kas_1110 or sumber_transaksi.startswith("1110"):
     render_kas_bank_keluar()
   elif sumber_transaksi == "Gudang":
     render_gudang_persediaan()

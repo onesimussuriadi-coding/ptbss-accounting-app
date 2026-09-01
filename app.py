@@ -3,28 +3,25 @@ import os
 import pandas as pd
 import streamlit as st
 
-# Import modul secara tepat berdasarkan jalur folder modules
-try:
-    from modules.master import (
-        render_modul_0,
-        FILE_MASTER_COA,
-        simpan_excel_cantik,
-    )
-    from modules.input_dokumen.modul_1 import render_modul_1
-    from modules.penjurnalan import render_modul_2
-    from modules.laporan import render_modul_3
-except ImportError:
-    from master import render_modul_0, FILE_MASTER_COA, simpan_excel_cantik
-    from input_dokumen.modul_1 import render_modul_1
-    from penjurnalan import render_modul_2
-    from laporan import render_modul_3
+# Impor modul secara mutlak dari dalam folder modules
+from modules.master import (
+    render_modul_0,
+    FILE_MASTER_COA,
+    simpan_excel_cantik,
+)
+from modules.input_dokumen.modul_1 import render_modul_1
+from modules.penjurnalan import render_modul_2
+from modules.laporan import render_modul_3
+from modules.pusat_kendali_kabag import render_pusat_kendali_kabag
 
 st.set_page_config(
     page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide"
 )
 
-# NAMA FILE EXCEL UNTUK PENYIMPANAN PERMANEN USERS
+# NAMA FILE EXCEL UNTUK PENYIMPANAN PERMANEN USERS & TRANSAKSI
 FILE_USERS_EXCEL = "master_users.xlsx"
+EXCEL_DB_PATH = "database_transaksi_bss.xlsx"
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 abs_users_path = os.path.join(current_dir, "modules", FILE_USERS_EXCEL)
 if not os.path.exists(abs_users_path):
@@ -100,6 +97,26 @@ if "user_dept" not in st.session_state:
     st.session_state.user_dept = None
 if "user_name" not in st.session_state:
     st.session_state.user_name = None
+
+# LOAD ATAU INISIALISASI DATABASE TRANSAKSI PERMANEN
+if "data_operasional" not in st.session_state:
+    if os.path.exists(EXCEL_DB_PATH):
+        try:
+            st.session_state.data_operasional = pd.read_excel(EXCEL_DB_PATH)
+        except Exception:
+            st.session_state.data_operasional = pd.DataFrame(columns=[
+                "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+                "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+                "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+                "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+            ])
+    else:
+        st.session_state.data_operasional = pd.DataFrame(columns=[
+            "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+            "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+            "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+            "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+        ])
 
 abs_file_path = os.path.join(current_dir, "modules", FILE_MASTER_COA)
 if not os.path.exists(abs_file_path):
@@ -177,29 +194,6 @@ if "master_supplier" not in st.session_state:
         "CV Sumber Berkat Mandiri",
         "Toko Maju Jaya Teknik",
     ]
-
-if "data_operasional" not in st.session_state:
-    st.session_state.data_operasional = pd.DataFrame(
-        columns=[
-            "Nomor Bukti",
-            "Tanggal",
-            "Sumber Transaksi",
-            "Supplier",
-            "Business Unit",
-            "Departemen Tujuan",
-            "Jumlah",
-            "Satuan",
-            "Peruntukan",
-            "Keterangan",
-            "DPP",
-            "PPN",
-            "PPH",
-            "Total",
-            "Status Dokumen",
-            "Status Jurnal",
-            "Nama Penginput",
-        ]
-    )
 
 if "data_jurnal" not in st.session_state:
     st.session_state.data_jurnal = pd.DataFrame(
@@ -434,113 +428,7 @@ elif menu == "Modul 1: Input Dokumen Operasional":
     render_modul_1()
 
 elif menu == "Pusat Kendali & Approval Bertingkat":
-    st.subheader(
-        f"📂 Pusat Kendali Dokumen & Workflow Berjenjang ({role_kini} - {dept_kini})"
-    )
-    st.info(f"Pengguna Aktif: **{nama_kini}** | Peran: **{role_kini}**")
-
-    if not st.session_state.data_operasional.empty:
-        df_all = st.session_state.data_operasional.copy()
-
-        # Filter tampilan berdasarkan role/departemen yang berhak melihat
-        if role_kini == "Kabag":
-            df_pusat = df_all[df_all["Departemen Tujuan"] == dept_kini]
-        elif role_kini in [
-            "Kabag Keuangan",
-            "Kasir",
-            "Accounting",
-            "Manajer",
-            "Programmer",
-        ]:
-            df_pusat = df_all
-        else:
-            df_pusat = pd.DataFrame(columns=df_all.columns)
-
-        if not df_pusat.empty:
-            st.dataframe(df_pusat, use_container_width=True)
-            st.markdown("---")
-            list_nobukti = df_pusat["Nomor Bukti"].tolist()
-            pilih_bukti = st.selectbox(
-                "Pilih Nomor Bukti untuk Diproses", ["-- Pilih --"] + list_nobukti
-            )
-
-            if pilih_bukti != "-- Pilih --":
-                row = df_pusat[df_pusat["Nomor Bukti"] == pilih_bukti].iloc[0]
-                st.write(
-                    "Status Dokumen Saat Ini: **"
-                    f"{row.get('Status Dokumen', 'Menunggu Approval')}**"
-                )
-
-                c1, c2, c3, c4 = st.columns(4)
-
-                # 1. Approval Kabag Departemen
-                with c1:
-                    if role_kini in ["Kabag", "Programmer"] and st.button(
-                        "✅ Approve Kabag"
-                    ):
-                        st.session_state.data_operasional.loc[
-                            st.session_state.data_operasional["Nomor Bukti"]
-                            == pilih_bukti,
-                            "Status Dokumen",
-                        ] = "Disetujui Kabag ➡️ Menunggu Kabag Keuangan/Logistik"
-                        st.success("Disetujui oleh Kabag!")
-                        st.rerun()
-
-                # 2. Approval Kabag Keuangan & Pemeriksaan
-                with c2:
-                    if role_kini in [
-                        "Kabag Keuangan",
-                        "Programmer",
-                    ] and st.button("💼 Approve Kabag Keuangan"):
-                        st.session_state.data_operasional.loc[
-                            st.session_state.data_operasional["Nomor Bukti"]
-                            == pilih_bukti,
-                            "Status Dokumen",
-                        ] = "Disetujui Kabag Keuangan ➡️ Menunggu Kasir/Accounting"
-                        st.success(
-                            "Disetujui Kabag Keuangan & diteruskan ke Kasir/Accounting!"
-                        )
-                        st.rerun()
-
-                # 3. Approval Kasir (Khusus Kas/Bank)
-                with c3:
-                    if role_kini in ["Kasir", "Programmer"] and st.button(
-                        "💵 Kasir: Approve Bayar"
-                    ):
-                        st.session_state.data_operasional.loc[
-                            st.session_state.data_operasional["Nomor Bukti"]
-                            == pilih_bukti,
-                            "Status Dokumen",
-                        ] = (
-                            "Pembayaran Disetujui Kasir ➡️ Siap Dijurnal Accounting"
-                        )
-                        st.success(
-                            "Pembayaran kasir disahkan, siap masuk Accounting!"
-                        )
-                        st.rerun()
-
-                # 4. Verifikasi & Penjurnalan oleh Accounting
-                with c4:
-                    if role_kini in [
-                        "Accounting",
-                        "Programmer",
-                    ] and st.button("📝 Accounting: Proses Jurnal"):
-                        st.session_state.data_operasional.loc[
-                            st.session_state.data_operasional["Nomor Bukti"]
-                            == pilih_bukti,
-                            ["Status Jurnal", "Status Dokumen"],
-                        ] = [
-                            "Sudah Dijurnal",
-                            "Selesai (Tercatat di Accounting)",
-                        ]
-                        st.success("Dokumen berhasil dijurnal secara terpusat!")
-                        st.rerun()
-        else:
-            st.warning(
-                f"Tidak ada dokumen untuk wewenang departemen/peran **{role_kini}**."
-            )
-    else:
-        st.info("Belum ada dokumen operasional yang tersimpan di sistem.")
+    render_pusat_kendali_kabag()
 
 elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
     render_modul_2()
