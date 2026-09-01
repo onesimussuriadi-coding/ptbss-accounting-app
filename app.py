@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 
-# Impor modul secara mutlak dari dalam folder modules
+# Impor modul utama secara aman
 from modules.master import (
     render_modul_0,
     FILE_MASTER_COA,
@@ -12,13 +12,21 @@ from modules.master import (
 from modules.input_dokumen.modul_1 import render_modul_1
 from modules.penjurnalan import render_modul_2
 from modules.laporan import render_modul_3
-from modules.pusat_kendali_kabag import render_pusat_kendali_kabag
+
+# Impor aman untuk pusat_kendali_kabag (mendukung root maupun folder modules)
+try:
+    from pusat_kendali_kabag import render_pusat_kendali_kabag
+except ImportError:
+    try:
+        from modules.pusat_kendali_kabag import render_pusat_kendali_kabag
+    except ImportError:
+        def render_pusat_kendali_kabag():
+            st.error("Modul pusat_kendali_kabag belum ditemukan. Pastikan file sudah tersimpan di direktori utama atau folder modules.")
 
 st.set_page_config(
     page_title="Sistem Akuntansi PT BSS", page_icon="📊", layout="wide"
 )
 
-# NAMA FILE EXCEL UNTUK PENYIMPANAN PERMANEN USERS & TRANSAKSI
 FILE_USERS_EXCEL = "master_users.xlsx"
 EXCEL_DB_PATH = "database_transaksi_bss.xlsx"
 
@@ -27,7 +35,7 @@ abs_users_path = os.path.join(current_dir, "modules", FILE_USERS_EXCEL)
 if not os.path.exists(abs_users_path):
     abs_users_path = os.path.join(current_dir, FILE_USERS_EXCEL)
 
-# INISIALISASI ATAU LOAD DATABASE USERS BERDASARKAN URUTAN KOLOM EXCEL
+# INISIALISASI ATAU LOAD DATABASE USERS
 if "credentials_dict" not in st.session_state:
     default_users = {
         "programmer": {
@@ -70,7 +78,6 @@ if "credentials_dict" not in st.session_state:
         except:
             pass
 
-
 def save_users_to_excel():
     rows = []
     for u, d in st.session_state.credentials_dict.items():
@@ -87,8 +94,7 @@ def save_users_to_excel():
     except Exception as e:
         st.error(f"Gagal menyimpan data user: {e}")
 
-
-# INISIALISASI SESSION STATE UTAMA
+# SESSION STATE UTAMA
 if "authenticated_user" not in st.session_state:
     st.session_state.authenticated_user = None
 if "user_role" not in st.session_state:
@@ -98,7 +104,6 @@ if "user_dept" not in st.session_state:
 if "user_name" not in st.session_state:
     st.session_state.user_name = None
 
-# LOAD ATAU INISIALISASI DATABASE TRANSAKSI PERMANEN
 if "data_operasional" not in st.session_state:
     if os.path.exists(EXCEL_DB_PATH):
         try:
@@ -145,20 +150,6 @@ if "master_coa" not in st.session_state:
                 "Sub Kategori": "11 - Aktiva Lancar",
                 "Kategori": "1 - Aktiva",
             },
-            {
-                "Kode Akun": "1120.001",
-                "Nama Akun": "BCA 0884791339 an. Vonny",
-                "Sub Account": "112 - Bank",
-                "Sub Kategori": "11 - Aktiva Lancar",
-                "Kategori": "1 - Aktiva",
-            },
-            {
-                "Kode Akun": "5133.001",
-                "Nama Akun": "Alat Tulis Kantor",
-                "Sub Account": "513 - Harga Pokok Proyek Jasa Umum",
-                "Sub Kategori": "51 - Harga Pokok Proyek GS",
-                "Kategori": "5 - Harga Pokok Penjualan",
-            },
         ])
         try:
             simpan_excel_cantik(st.session_state.master_coa, abs_file_path)
@@ -175,15 +166,7 @@ if "master_bu" not in st.session_state:
 
 if "master_satuan" not in st.session_state:
     st.session_state.master_satuan = [
-        "Unit",
-        "Lot",
-        "Liter",
-        "Jam",
-        "Pcs",
-        "Hari",
-        "Bulan",
-        "Trip",
-        "M3",
+        "Unit", "Lot", "Liter", "Jam", "Pcs", "Hari", "Bulan", "Trip", "M3",
     ]
 
 if "master_supplier" not in st.session_state:
@@ -198,20 +181,12 @@ if "master_supplier" not in st.session_state:
 if "data_jurnal" not in st.session_state:
     st.session_state.data_jurnal = pd.DataFrame(
         columns=[
-            "ID Jurnal",
-            "ID Dokumen",
-            "Tanggal",
-            "Nomor Bukti",
-            "Kode Akun",
-            "Nama Akun",
-            "Debit",
-            "Kredit",
+            "ID Jurnal", "ID Dokumen", "Tanggal", "Nomor Bukti",
+            "Kode Akun", "Nama Akun", "Debit", "Kredit",
         ]
     )
 
-# =========================================================================
-# HALAMAN LOGIN UTAMA SISTEM
-# =========================================================================
+# HALAMAN LOGIN
 if not st.session_state.authenticated_user:
     col_spacer1, col_center, col_spacer2 = st.columns([1, 1.8, 1])
     with col_center:
@@ -226,20 +201,11 @@ if not st.session_state.authenticated_user:
             " margin-top: -10px;'>Dashboard Keuangan Terintegrasi</h4>",
             unsafe_allow_html=True,
         )
-        st.markdown(
-            "<p style='text-align: center; color: #94A3B8; font-size: 14px;'>Silakan"
-            " masukkan Username dan Password Anda.</p>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-
         with st.form("login_center_form"):
             u_input = st.text_input("Username", value="")
             p_input = st.text_input("Password", type="password", value="")
             st.markdown("<br>", unsafe_allow_html=True)
-            b_login = st.form_submit_button(
-                "🔑 Masuk Sistem", use_container_width=True
-            )
+            b_login = st.form_submit_button("🔑 Masuk Sistem", use_container_width=True)
 
             if b_login:
                 creds = st.session_state.credentials_dict
@@ -252,13 +218,6 @@ if not st.session_state.authenticated_user:
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
-
-        st.markdown(
-            "<p style='text-align: center; font-size: 12px; color: #CBD5E1;"
-            " margin-top: 30px;'>Internal Corporate Accounting System © 2026 PT"
-            " BSS</p>",
-            unsafe_allow_html=True,
-        )
     st.stop()
 
 role_kini = st.session_state.user_role
@@ -284,33 +243,18 @@ with st.sidebar:
                 new_role = st.selectbox(
                     "Hak Akses / Role (Kolom C)",
                     [
-                        "Staf",
-                        "Kabag",
-                        "Kabag Keuangan",
-                        "Kasir",
-                        "Accounting",
-                        "Manajer",
-                        "Programmer",
+                        "Staf", "Kabag", "Kabag Keuangan", "Kasir",
+                        "Accounting", "Manajer", "Programmer",
                     ],
                 )
                 new_dept = st.selectbox(
                     "Departemen (Kolom D)",
                     [
-                        "Operasional",
-                        "HRD",
-                        "Logistik",
-                        "Maintenance",
-                        "HSE",
-                        "Akuntansi",
-                        "Keuangan",
-                        "Manajemen",
-                        "IT / Pengembangan",
+                        "Operasional", "HRD", "Logistik", "Maintenance",
+                        "HSE", "Akuntansi", "Keuangan", "Manajemen", "IT / Pengembangan",
                     ],
                 )
-
-                btn_daftarkan = st.form_submit_button(
-                    "➕ Daftarkan Akun", use_container_width=True
-                )
+                btn_daftarkan = st.form_submit_button("➕ Daftarkan Akun", use_container_width=True)
 
                 if btn_daftarkan:
                     if new_username and new_password and new_name:
@@ -318,23 +262,14 @@ with st.sidebar:
                             st.error("Username sudah terdaftar!")
                         else:
                             st.session_state.credentials_dict[new_username] = {
-                                "pass": new_password,
-                                "role": new_role,
-                                "dept": new_dept,
-                                "name": new_name,
+                                "pass": new_password, "role": new_role,
+                                "dept": new_dept, "name": new_name,
                             }
                             save_users_to_excel()
-                            st.success(
-                                f"Akun **{new_username}** berhasil didaftarkan!"
-                            )
+                            st.success(f"Akun **{new_username}** berhasil didaftarkan!")
                             st.rerun()
                     else:
                         st.warning("Lengkapi Nama, Username, dan Password!")
-
-            if st.checkbox("📁 Lihat & Kelola Akun Terdaftar"):
-                st.write("---")
-                for u, d in st.session_state.credentials_dict.items():
-                    st.text(f"• {u} ({d['name']} - {d['role']})")
 
         st.markdown("---")
 
@@ -343,16 +278,12 @@ with st.sidebar:
         st.session_state.user_role = None
         st.session_state.user_dept = None
         st.session_state.user_name = None
-        if "modul1_verified" in st.session_state:
-            st.session_state.modul1_verified = False
-            st.session_state.modul1_dept = None
-            st.session_state.modul1_user = None
         st.rerun()
 
 st.title("📊 Sistem Akuntansi Terintegrasi PT Banggai Sentral Sulawesi")
 st.write(f"Dashboard Keuangan Berbasis Wewenang Aktif: `{role_kini} - {dept_kini}`")
 
-# Pengaturan Menu Berdasarkan Hierarki
+# PENGATURAN MENU BERDASARKAN HIERARKI
 if role_kini == "Staf":
     daftar_menu = ["Dashboard Utama", "Modul 1: Input Dokumen Operasional"]
 elif role_kini == "Kabag":
@@ -384,6 +315,7 @@ else:  # Programmer
 
 menu = st.sidebar.selectbox("Pilih Menu / Modul Utama", daftar_menu)
 
+# ROUTING MENU UTAMA
 if menu == "Dashboard Utama":
     st.markdown("""
         <div style='background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 35px; border-radius: 14px; color: white; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
@@ -420,18 +352,13 @@ if menu == "Dashboard Utama":
         f"💡 **Status Akun:** Anda masuk sebagai **{role_kini}** ({nama_kini}) pada"
         f" Departemen **{dept_kini}**."
     )
-
 elif menu == "Modul 0: Pengaturan Master Akun & BU":
     render_modul_0()
-
 elif menu == "Modul 1: Input Dokumen Operasional":
     render_modul_1()
-
 elif menu == "Pusat Kendali & Approval Bertingkat":
     render_pusat_kendali_kabag()
-
 elif menu == "Modul 2: Proses Penjurnalan Akuntansi":
     render_modul_2()
-
 elif menu == "Modul 3: Output Laporan Keuangan":
     render_modul_3()
