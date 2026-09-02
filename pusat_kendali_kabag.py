@@ -1,3 +1,4 @@
+import json
 import os
 import pandas as pd
 import streamlit as st
@@ -14,15 +15,26 @@ def load_persistent_data():
                     "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
                     "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
                     "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
-                    "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+                    "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Catatan Revisi", "Raw_Items"
                 ])
         else:
             st.session_state.data_operasional = pd.DataFrame(columns=[
                 "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
                 "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
                 "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
-                "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+                "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Catatan Revisi", "Raw_Items"
             ])
+            
+    if "Catatan Revisi" not in st.session_state.data_operasional.columns:
+        st.session_state.data_operasional["Catatan Revisi"] = ""
+    else:
+        st.session_state.data_operasional["Catatan Revisi"] = st.session_state.data_operasional["Catatan Revisi"].astype(str).fillna("")
+
+    if "Raw_Items" not in st.session_state.data_operasional.columns:
+        st.session_state.data_operasional["Raw_Items"] = ""
+    
+    if not st.session_state.data_operasional.empty and "Tanggal" in st.session_state.data_operasional.columns:
+        st.session_state.data_operasional["Tanggal"] = pd.to_datetime(st.session_state.data_operasional["Tanggal"], errors='coerce').dt.strftime('%Y-%m-%d').fillna("-")
 
 def save_persistent_data():
     try:
@@ -33,7 +45,6 @@ def save_persistent_data():
 def render_pusat_kendali_kabag():
     load_persistent_data()
 
-    # Inisialisasi session state verifikasi khusus Kabag
     if "kabag_verified" not in st.session_state:
         st.session_state.kabag_verified = False
     if "kabag_dept" not in st.session_state:
@@ -41,9 +52,7 @@ def render_pusat_kendali_kabag():
     if "kabag_user" not in st.session_state:
         st.session_state.kabag_user = ""
 
-    # =========================================================================
-    # FORM VERIFIKASI AKSES PENGINPUTAN (SEPERTI DI MODUL 1)
-    # =========================================================================
+    # FORM VERIFIKASI AKSES KABAG
     if not st.session_state.kabag_verified:
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col_center, col2 = st.columns([1, 1.8, 1])
@@ -52,21 +61,14 @@ def render_pusat_kendali_kabag():
             st.markdown("""
                 <div style='text-align: center; padding: 10px;'>
                     <h2 style='color: #1E3A8A; margin-bottom: 5px;'>🔐 Verifikasi Akses Pusat Kendali</h2>
-                    <p style='color: #64748B; font-size: 14px;'>Silakan pilih departemen tujuan dan masukkan Username atau Nama Lengkap Kabag.</p>
+                    <p style='color: #64748B; font-size: 14px;'>Silakan pilih departemen wewenang dan masukkan Nama/Username Kabag.</p>
                 </div>
             """, unsafe_allow_html=True)
             
             with st.form("form_verifikasi_akses_kabag"):
                 daftar_dept = [
-                    "Operasional",
-                    "HRD",
-                    "Logistik",
-                    "Maintenance",
-                    "HSE",
-                    "Akuntansi",
-                    "Keuangan",
-                    "Manajemen",
-                    "IT / Pengembangan"
+                    "Operasional", "HRD", "Logistik", "Maintenance",
+                    "HSE", "Akuntansi", "Keuangan", "Manajemen", "IT / Pengembangan"
                 ]
                 
                 default_dept_user = st.session_state.get("user_dept", "Operasional")
@@ -74,8 +76,8 @@ def render_pusat_kendali_kabag():
                 if default_dept_user in daftar_dept:
                     idx_default = daftar_dept.index(default_dept_user)
 
-                pilih_dept = st.selectbox("Departemen Tujuan / Wewenang", daftar_dept, index=idx_default)
-                input_user = st.text_input("Username / Nama Penginput", value=st.session_state.get("user_name", st.session_state.get("authenticated_user", "")))
+                pilih_dept = st.selectbox("Departemen Wewenang", daftar_dept, index=idx_default)
+                input_user = st.text_input("Username / Nama Lengkap Kabag", value=st.session_state.get("user_name", st.session_state.get("authenticated_user", "")))
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 btn_verif = st.form_submit_button("🚀 Masuk ke Pusat Kendali", use_container_width=True)
@@ -85,25 +87,23 @@ def render_pusat_kendali_kabag():
                         st.session_state.kabag_verified = True
                         st.session_state.kabag_dept = pilih_dept
                         st.session_state.kabag_user = input_user.strip()
-                        st.success("Verifikasi akses berhasil! Memuat dashboard...")
+                        st.success("Verifikasi akses berhasil!")
                         st.rerun()
                     else:
                         st.warning("Mohon isi Username atau Nama Lengkap Anda.")
         return
 
-    # =========================================================================
-    # DASHBOARD UTAMA PUSAT KENDALI KABAG SETELAH TERVERIFIKASI
-    # =========================================================================
+    # DASHBOARD KABAG TERVERIFIKASI
     active_dept = st.session_state.kabag_dept
     active_user = st.session_state.kabag_user
 
     c_head1, c_head2 = st.columns([3, 1])
     with c_head1:
         st.subheader(f"📂 Pusat Kendali & Approval Berjenjang ({active_dept})")
-        st.info(f"Kepala Bagian Aktif: **{active_user}** | Wewenang Divisi: **{active_dept}**")
+        st.info(f"Kepala Bagian Aktif: **{active_user}** | Divisi: **{active_dept}**")
     with c_head2:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Ganti Akses / Departemen", use_container_width=True):
+        if st.button("🔄 Ganti Akses / Divisi", use_container_width=True):
             st.session_state.kabag_verified = False
             st.rerun()
 
@@ -114,69 +114,211 @@ def render_pusat_kendali_kabag():
         st.info("ℹ️ Belum ada data dokumen operasional yang tersimpan di sistem.")
         return
 
-    # Filter dokumen berdasarkan Departemen Tujuan yang dipilih
-    if "Status Dokumen" in df_ops.columns and "Departemen Tujuan" in df_ops.columns:
-        df_approval_kabag = df_ops[
-            (
-                df_ops["Status Dokumen"].str.contains(f"Kepala Bagian {active_dept}", case=False, na=False) |
-                df_ops["Status Dokumen"].str.contains(f"Menunggu Approval.*{active_dept}", case=False, na=False)
-            ) & 
-            (
-                df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()
-            )
-        ]
+    if active_dept.lower() == "keuangan":
+        mask_pending = df_ops["Status Dokumen"].str.contains("Menunggu Persetujuan Bagian Keuangan", case=False, na=False)
+        df_approval_kabag = df_ops[mask_pending]
+        df_tampil_tabel = df_ops[mask_pending | df_ops["Status Dokumen"].str.contains("Keuangan", case=False, na=False)]
     else:
-        df_approval_kabag = pd.DataFrame(columns=df_ops.columns)
+        mask_dept = df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()
+        mask_pending = df_ops["Status Dokumen"].str.contains("Menunggu Approval|Revisi|Ditolak oleh Bagian Keuangan", case=False, na=False)
+        df_approval_kabag = df_ops[mask_dept & mask_pending]
+        df_tampil_tabel = df_ops[mask_dept]
+
+    st.markdown(f"### 📋 Daftar Dokumen Masuk Pending Approval & Verifikasi ({active_dept})")
+    
+    if not df_tampil_tabel.empty:
+        kolom_tampil = [col for col in ["Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi", "Total", "Status Dokumen", "Catatan Revisi", "Nama Penginput"] if col in df_tampil_tabel.columns]
+        st.dataframe(df_tampil_tabel[kolom_tampil], use_container_width=True)
+    else:
+        st.info("Belum ada data dokumen untuk divisi ini.")
 
     if df_approval_kabag.empty:
-        st.success(f"🎉 Tidak ada dokumen pending yang menunggu approval untuk Divisi **{active_dept}** saat ini.")
-        
-        st.markdown("---")
-        st.markdown(f"### 📚 Riwayat Dokumen Masuk Divisi {active_dept}")
-        if "Departemen Tujuan" in df_ops.columns:
-            df_riwayat = df_ops[df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()]
-            if not df_riwayat.empty:
-                kolom_riwayat = [c for c in ["Nomor Bukti", "Sumber Transaksi", "Total", "Status Dokumen", "Tanggal", "Nama Penginput"] if c in df_riwayat.columns]
-                st.dataframe(df_riwayat[kolom_riwayat], use_container_width=True)
+        st.success(f"🎉 Tidak ada dokumen pending yang membutuhkan tindakan approval untuk Divisi **{active_dept}** saat ini.")
         return
 
-    st.markdown(f"### 📋 Daftar Dokumen Masuk Pending Approval ({active_dept})")
-    
-    kolom_tampil = [
-        col for col in ["Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi", "Total", "Status Dokumen", "Nama Penginput"]
-        if col in df_approval_kabag.columns
-    ]
-    st.dataframe(df_approval_kabag[kolom_tampil], use_container_width=True)
-
     st.markdown("---")
-    st.markdown("### ✍️ Panel Aksi Verifikasi & Approval Kabag")
+    st.markdown("### 🔍 Panel Pemeriksaan & Koreksi Dokumen")
     
     list_nomor_bukti = df_approval_kabag["Nomor Bukti"].tolist()
     
-    col_pilih, col_app, col_tolak = st.columns([2, 1, 1])
-    with col_pilih:
-        pilih_dokumen = st.selectbox("Pilih Nomor Bukti Dokumen", ["-- Pilih Nomor Bukti --"] + list_nomor_bukti, key=f"sel_approval_kabag_{active_dept}")
+    col_sel, _ = st.columns([2, 1])
+    with col_sel:
+        pilih_dokumen = st.selectbox("Pilih Nomor Bukti Dokumen untuk Diperiksa", ["-- Pilih Nomor Bukti --"] + list_nomor_bukti, key=f"sel_dok_{active_dept}")
     
-    with col_app:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("✅ Approve Dokumen", use_container_width=True, key=f"btn_app_{active_dept}"):
-            if pilih_dokumen != "-- Pilih Nomor Bukti --":
-                mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
-                st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Disetujui Kabag {active_dept} - Menunggu Verifikasi Akuntansi"
-                save_persistent_data()
-                st.success(f"Dokumen **{pilih_dokumen}** berhasil di-Approve dan diteruskan ke bagian Akuntansi!")
-                st.rerun()
-            else:
-                st.warning("Pilih Nomor Bukti dokumen.")
+    if pilih_dokumen != "-- Pilih Nomor Bukti --":
+        row_data = df_ops[df_ops["Nomor Bukti"] == pilih_dokumen]
+        if not row_data.empty:
+            r = row_data.iloc[0]
+            st.markdown(f"#### 📄 Pratinjau Dokumen: `{pilih_dokumen}`")
+            
+            with st.container(border=True):
+                d_col1, d_col2, d_col3 = st.columns(3)
+                with d_col1:
+                    st.text(f"Tanggal: {r.get('Tanggal', '-')}")
+                    st.text(f"Lawan Transaksi: {r.get('Lawan Transaksi', '-')}")
+                with d_col2:
+                    st.text(f"Business Unit: {r.get('Business Unit', '-')}")
+                    st.text(f"Departemen Tujuan: {r.get('Departemen Tujuan', '-')}")
+                with d_col3:
+                    st.text(f"No Invoice: {r.get('No Invoice', '-')}")
+                    st.text(f"Penginput: {r.get('Nama Penginput', '-')}")
+                
+                st.markdown("---")
+                
+                st.markdown("##### 💳 Pengecekan & Validasi Sumber Akun Kas (Master COA)")
+                
+                list_kas_111 = []
+                if os.path.exists("master_coa_bss.xlsx"):
+                    try:
+                        df_coa = pd.read_excel("master_coa_bss.xlsx")
+                        df_coa.columns = df_coa.columns.str.replace("\xa0", " ").str.strip()
+                        col_kode = df_coa.columns[0]
+                        col_nama = df_coa.columns[1] if len(df_coa.columns) > 1 else df_coa.columns[0]
+                        mask_111 = df_coa[col_kode].astype(str).str.startswith("111")
+                        df_filtered = df_coa[mask_111]
+                        if not df_filtered.empty:
+                            list_kas_111 = (
+                                df_filtered[col_kode].astype(str).str.strip()
+                                + " - "
+                                + df_filtered[col_nama].astype(str).str.strip()
+                            ).tolist()
+                    except Exception:
+                        pass
 
-    with col_tolak:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("❌ Tolak / Revisi", use_container_width=True, key=f"btn_tolak_{active_dept}"):
-            if pilih_dokumen != "-- Pilih Nomor Bukti --":
-                mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
-                st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Ditolak Kabag {active_dept} (Perlu Revisi)"
-                save_persistent_data()
-                st.error(f"Dokumen **{pilih_dokumen}** ditolak dan dikembalikan.")
-                st.rerun()
-            else:
-                st.warning("Pilih Nomor Bukti dokumen.")
+                if not list_kas_111:
+                    list_kas_111 = [
+                        "1110.001 - Kas Besar Luwuk",
+                        "1110.002 - Kas Operasional Surabaya",
+                        "1110.003 - Kas Operasional Jakarta",
+                        "1110.012 - Kas Kecil",
+                        "1110.013 - Kas Proyek CR Umum",
+                        "1110.014 - Kas Proyek GS Umum",
+                        "1110.031 - Kas Top Up Tiket Pesawat"
+                    ]
+
+                sumber_transaksi_saat_ini = str(r.get('Sumber Transaksi', ''))
+                idx_coa = 0
+                for idx, item_coa in enumerate(list_kas_111):
+                    if item_coa.split(" - ")[0].strip() in sumber_transaksi_saat_ini or sumber_transaksi_saat_ini.lower() in item_coa.lower():
+                        idx_coa = idx
+                        break
+
+                pilih_validasi_akun = st.selectbox(
+                    "Pilih Sumber Dokumen / Akun Kas (Operasional)", 
+                    list_kas_111, 
+                    index=idx_coa, 
+                    key=f"val_akun_{pilih_dokumen}"
+                )
+
+                st.markdown("---")
+
+                st.markdown("##### 📦 Rincian Item Transaksi & Koreksi Langsung")
+                raw_items_str = r.get("Raw_Items", "")
+                items_list = []
+                if pd.notna(raw_items_str) and str(raw_items_str).strip() != "":
+                    try:
+                        items_list = json.loads(str(raw_items_str))
+                    except:
+                        items_list = []
+
+                # FORM EDIT PERSIS DENGAN TAMPILAN INPUT ADMIN (MENGGUNAKAN DATA LAMA)
+                with st.form(f"form_edit_item_{pilih_dokumen}"):
+                    st.markdown("🛠️ **Edit Langsung Keterangan / Uraian Item**")
+                    
+                    # Ambil nilai string lama secara aman
+                    val_ket_umum = str(r.get('Keterangan', '')) if pd.notna(r.get('Keterangan')) else ""
+                    edited_keterangan_umum = st.text_input("Keterangan Umum / Peruntukan", value=val_ket_umum)
+                    
+                    new_items_list = []
+                    if items_list:
+                        for idx_it, it in enumerate(items_list):
+                            col_i1, col_i2 = st.columns([3, 1])
+                            with col_i1:
+                                curr_nama = str(it.get('Nama Barang / Uraian', '')) if pd.notna(it.get('Nama Barang / Uraian')) else ""
+                                u_nama = st.text_input(f"Uraian Item {idx_it+1}", value=curr_nama, key=f"edit_item_nama_{pilih_dokumen}_{idx_it}")
+                            with col_i2:
+                                curr_jml = float(it.get('Jumlah', 1)) if pd.notna(it.get('Jumlah')) else 1.0
+                                u_jml = st.number_input(f"Qty {idx_it+1}", value=curr_jml, key=f"edit_item_jml_{pilih_dokumen}_{idx_it}")
+                            new_items_list.append({
+                                "Nama Barang / Uraian": u_nama,
+                                "Jumlah": u_jml,
+                                "Satuan": it.get('Satuan', ''),
+                                "Total Harga": it.get('Total Harga', 0)
+                            })
+                    else:
+                        # Fallback jika raw_items kosong tapi ada keterangan umum
+                        curr_nama = val_ket_umum
+                        u_nama = st.text_input("Uraian Item 1", value=curr_nama, key=f"edit_item_nama_fb_{pilih_dokumen}")
+                        u_jml = st.number_input("Qty 1", value=float(r.get('Jumlah', 1)), key=f"edit_item_jml_fb_{pilih_dokumen}")
+                        new_items_list.append({
+                            "Nama Barang / Uraian": u_nama,
+                            "Jumlah": u_jml,
+                            "Satuan": r.get('Satuan', ''),
+                            "Total Harga": r.get('Total', 0)
+                        })
+                    
+                    updated_items_json = json.dumps(new_items_list)
+
+                    btn_simpan_edit = st.form_submit_button("💾 Simpan Koreksi Perubahan Teks", use_container_width=True)
+                    if btn_simpan_edit:
+                        mask_ed = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
+                        st.session_state.data_operasional.loc[mask_ed, "Keterangan"] = edited_keterangan_umum
+                        st.session_state.data_operasional.loc[mask_ed, "Raw_Items"] = updated_items_json
+                        save_persistent_data()
+                        st.success("Koreksi teks uraian berhasil disimpan!")
+                        st.rerun()
+
+                st.markdown(f"**Total Keseluruhan (IDR):** Rp {r.get('Total', 0):,.2f}")
+                
+                if pd.notna(r.get("Catatan Revisi")) and str(r.get("Catatan Revisi")).strip() != "" and str(r.get("Catatan Revisi")) != "nan":
+                    st.info(f"📝 **Catatan / Riwayat Koreksi:** {r.get('Catatan Revisi')}")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Form Keputusan Pemeriksaan Kabag (Approve / Tolak)
+            with st.form(f"form_aksi_approval_{pilih_dokumen}"):
+                if active_dept.lower() == "keuangan":
+                    st.markdown("**Form Keputusan Pembayaran & Verifikasi Keuangan:**")
+                else:
+                    st.markdown("**Form Keputusan Pemeriksaan Kabag:**")
+                    
+                catatan_input = st.text_area("Catatan Pemeriksaan / Koreksi (Wajib diisi jika menolak atau meminta revisi)", value="")
+                
+                col_aksi1, col_aksi2 = st.columns(2)
+                with col_aksi1:
+                    btn_approve_final = st.form_submit_button("✅ Approve & Submit ke Bagian Keuangan", use_container_width=True)
+                with col_aksi2:
+                    btn_tolak_revisi = st.form_submit_button("❌ Tolak / Minta Revisi", use_container_width=True)
+                
+                if btn_approve_final:
+                    mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
+                    st.session_state.data_operasional["Catatan Revisi"] = st.session_state.data_operasional["Catatan Revisi"].astype(str)
+                    
+                    if active_dept.lower() == "keuangan":
+                        st.session_state.data_operasional.loc[mask, "Status Dokumen"] = "Disetujui Bagian Keuangan (Selesai)"
+                    else:
+                        st.session_state.data_operasional.loc[mask, "Status Dokumen"] = "Menunggu Persetujuan Bagian Keuangan"
+                        
+                    st.session_state.data_operasional.loc[mask, "Sumber Transaksi"] = pilih_validasi_akun
+                    st.session_state.data_operasional.loc[mask, "Catatan Revisi"] = ""
+                    save_persistent_data()
+                    st.success(f"✅ Dokumen **{pilih_dokumen}** berhasil disetujui dan disubmit dilanjutkan ke tahap berikutnya!")
+                    st.balloons()
+                    st.rerun()
+                
+                if btn_tolak_revisi:
+                    if not catatan_input.strip():
+                        st.error("⚠️ Mohon isi Catatan / Alasan Koreksi agar staf mengetahui bagian yang harus diperbaiki!")
+                    else:
+                        mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
+                        st.session_state.data_operasional["Catatan Revisi"] = st.session_state.data_operasional["Catatan Revisi"].astype(str)
+                        
+                        if active_dept.lower() == "keuangan":
+                            st.session_state.data_operasional.loc[mask, "Status Dokumen"] = "Ditolak/Revisi oleh Bagian Keuangan"
+                        else:
+                            st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Ditolak/Revisi oleh Kabag {active_dept}"
+                            
+                        st.session_state.data_operasional.loc[mask, "Catatan Revisi"] = catatan_input
+                        save_persistent_data()
+                        st.error(f"❌ Dokumen **{pilih_dokumen}** dikembalikan untuk direvisi.")
+                        st.rerun()

@@ -1,11 +1,11 @@
-import streamlit as st
-import pandas as pd
 import io
+import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import pandas as pd
+import streamlit as st
 import streamlit.components.v1 as components
-import os
 
 FILE_MASTER_COA = "master_coa_bss.xlsx"
 FILE_MASTER_BU = "master_bu_bss.xlsx"
@@ -146,12 +146,16 @@ def muat_atau_buat_file(filepath, kolom_default, sheet_name):
     if os.path.exists(filepath):
         try:
             df_raw = pd.read_excel(filepath, header=0)
-            if not df_raw.empty and all(col in df_raw.columns for col in kolom_default):
+            if not df_raw.empty:
                 df_clean = pd.DataFrame()
                 for col in kolom_default:
-                    df_clean[col] = df_raw[col].fillna("").astype(str).str.strip()
+                    if col in df_raw.columns:
+                        df_clean[col] = df_raw[col].fillna("").astype(str).str.strip()
+                    else:
+                        df_clean[col] = ""
                 df_clean = df_clean[df_clean.iloc[:, 0] != ""]
-                return df_clean.reset_index(drop=True)
+                if not df_clean.empty:
+                    return df_clean.reset_index(drop=True)
         except Exception:
             pass
             
@@ -160,15 +164,17 @@ def muat_atau_buat_file(filepath, kolom_default, sheet_name):
     return df_kosong
 
 def muat_data_master_bersih():
+    """Fungsi khusus COA membaca file fisik, menjaga data permanen, dan menjalankan auto-generate kategori."""
+    kolom_coa = ["Kode Akun", "Nama Akun", "Sub Account", "Sub Kategori", "Kategori"]
     if os.path.exists(FILE_MASTER_COA):
         try:
             df_raw = pd.read_excel(FILE_MASTER_COA, header=0)
-            kolom_coa = ["Kode Akun", "Nama Akun", "Sub Account", "Sub Kategori", "Kategori"]
-            if not df_raw.empty and all(col in df_raw.columns for col in kolom_coa):
+            if not df_raw.empty:
                 df_clean = pd.DataFrame()
-                df_clean['Kode Akun'] = df_raw['Kode Akun'].fillna("").astype(str).str.strip()
-                df_clean['Nama Akun'] = df_raw['Nama Akun'].fillna("Tanpa Nama").astype(str)
+                df_clean['Kode Akun'] = df_raw.iloc[:, 0].fillna("").astype(str).str.strip()
+                df_clean['Nama Akun'] = df_raw.iloc[:, 1].fillna("Tanpa Nama").astype(str) if len(df_raw.columns) > 1 else "Tanpa Nama"
                 
+                # Jalankan otomatisasi pembacaan indikator kategori berdasarkan kode akun
                 sub_accs, sub_kats, kats = [], [], []
                 for kode in df_clean['Kode Akun']:
                     s_acc, s_kat, kat = generate_kategori_otomatis(kode)
@@ -181,11 +187,12 @@ def muat_data_master_bersih():
                 df_clean['Kategori'] = kats
                 
                 df_clean = df_clean[df_clean['Kode Akun'] != ""]
-                return df_clean.reset_index(drop=True)
+                if not df_clean.empty:
+                    return df_clean.reset_index(drop=True)
         except Exception:
             pass
             
-    df_kosong = pd.DataFrame(columns=["Kode Akun", "Nama Akun", "Sub Account", "Sub Kategori", "Kategori"])
+    df_kosong = pd.DataFrame(columns=kolom_coa)
     simpan_excel_cantik(df_kosong, FILE_MASTER_COA, 'Master_COA')
     return df_kosong
 
@@ -252,10 +259,8 @@ def render_preview_dan_cetak(df, judul_laporan, file_path, key_prefix):
             st.rerun()
 
 def render_modul_0():
-    # CSS untuk Sticky Header / Freeze Navigasi Master & Judul Modul di Atas Layar
     st.markdown("""
         <style>
-            /* Freeze Header Utama & Navigasi Tab */
             .stTabs {
                 position: sticky;
                 top: 0px;
@@ -279,23 +284,22 @@ def render_modul_0():
         </style>
     """, unsafe_allow_html=True)
 
-    # Inisialisasi & Validasi Ketat State Sesi & File Fisik
-    if 'master_coa' not in st.session_state or st.session_state.master_coa.empty or 'Kode Akun' not in st.session_state.master_coa.columns:
+    # Inisialisasi State Sesi Terhubung ke File Fisik Permanen
+    if 'master_coa' not in st.session_state or st.session_state.master_coa.empty:
         st.session_state.master_coa = muat_data_master_bersih()
-    if 'master_bu' not in st.session_state or st.session_state.master_bu.empty or 'Kode BU' not in st.session_state.master_bu.columns:
+    if 'master_bu' not in st.session_state or st.session_state.master_bu.empty:
         st.session_state.master_bu = muat_atau_buat_file(FILE_MASTER_BU, ["Kode BU", "Nama Business Unit", "Keterangan"], 'Master_BU')
-    if 'master_pelanggan' not in st.session_state or st.session_state.master_pelanggan.empty or 'Kode Pelanggan' not in st.session_state.master_pelanggan.columns:
+    if 'master_pelanggan' not in st.session_state or st.session_state.master_pelanggan.empty:
         st.session_state.master_pelanggan = muat_atau_buat_file(FILE_MASTER_PELANGGAN, ["Kode Pelanggan", "Nama Pelanggan", "Alamat", "Kontak"], 'Master_Pelanggan')
-    if 'master_pemasok' not in st.session_state or st.session_state.master_pemasok.empty or 'Kode Pemasok' not in st.session_state.master_pemasok.columns:
+    if 'master_pemasok' not in st.session_state or st.session_state.master_pemasok.empty:
         st.session_state.master_pemasok = muat_atau_buat_file(FILE_MASTER_PEMASOK, ["Kode Pemasok", "Nama Pemasok", "Alamat", "Kontak"], 'Master_Pemasok')
-    if 'master_gudang' not in st.session_state or st.session_state.master_gudang.empty or 'Kode Gudang' not in st.session_state.master_gudang.columns:
+    if 'master_gudang' not in st.session_state or st.session_state.master_gudang.empty:
         st.session_state.master_gudang = muat_atau_buat_file(FILE_MASTER_GUDANG, ["Kode Gudang", "Nama Gudang", "Lokasi", "Keterangan"], 'Master_Gudang')
-    if 'master_alat' not in st.session_state or st.session_state.master_alat.empty or 'Kode Alat' not in st.session_state.master_alat.columns:
+    if 'master_alat' not in st.session_state or st.session_state.master_alat.empty:
         st.session_state.master_alat = muat_atau_buat_file(FILE_MASTER_ALAT, ["Kode Alat", "Nama Alat / Unit", "Jenis / Kategori", "No. Polisi / Serial", "Keterangan"], 'Master_Alat')
 
     st.subheader("Modul 0: Pengaturan Master Data (COA, BU, Pelanggan, Pemasok, Gudang, & Alokasi Alat)")
     
-    # Navigasi 6 Tab Utama
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📁 Master Akun (COA)", 
         "🏢 Business Unit (BU)", 
@@ -311,7 +315,6 @@ def render_modul_0():
         st.info(f"📂 Direktori File Excel: folder utama aplikasi -> `{FILE_MASTER_COA}`")
         
         with st.expander("📂 Opsi Lanjutan: Impor / Upload File Excel Master Akun", expanded=False):
-            st.write("Unggah file Excel (Kolom A: Nomor Akun, Kolom B: Nama Akun). Kategori terisi otomatis.")
             uploaded_file = st.file_uploader("Pilih file Excel COA (.xlsx)", type=["xlsx"], key="up_coa")
             if uploaded_file is not None:
                 try:
@@ -334,7 +337,7 @@ def render_modul_0():
                     if not df_bersih.empty:
                         st.session_state.master_coa = df_bersih.reset_index(drop=True)
                         simpan_excel_cantik(st.session_state.master_coa, FILE_MASTER_COA, 'Master_COA')
-                        st.success(f"Berhasil! {len(st.session_state.master_coa)} akun diimpor.")
+                        st.success(f"Berhasil! {len(st.session_state.master_coa)} akun diimpor & disimpan permanen.")
                         st.rerun()
                 except Exception as e:
                     st.error(f"Gagal memproses file: {e}")
@@ -374,7 +377,7 @@ def render_modul_0():
                         st.session_state.master_coa.loc[st.session_state.master_coa['Kode Akun'] == pilih_akun_edit, ['Nama Akun', 'Sub Account', 'Sub Kategori', 'Kategori']] = [edit_nama_akun, s_acc, s_kat, kat]
                         st.session_state.master_coa = st.session_state.master_coa.reset_index(drop=True)
                         simpan_excel_cantik(st.session_state.master_coa, FILE_MASTER_COA, 'Master_COA')
-                        st.success(f"Akun **{pilih_akun_edit}** berhasil diperbarui!")
+                        st.success(f"Akun **{pilih_akun_edit}** berhasil diperbarui & disimpan permanen!")
                         st.rerun()
                 with col_k2:
                     if st.button("🗑️ Hapus Akun Ini", use_container_width=True, type="secondary", key=f"btn_del_{pilih_akun_edit}"):
@@ -398,7 +401,7 @@ def render_modul_0():
                     data_baru = {"Kode Akun": kode_bersih, "Nama Akun": input_nama_akun, "Sub Account": s_acc, "Sub Kategori": s_kat, "Kategori": kat}
                     st.session_state.master_coa = pd.concat([st.session_state.master_coa, pd.DataFrame([data_baru])], ignore_index=True).drop_duplicates(subset=["Kode Akun"], keep="last").reset_index(drop=True)
                     simpan_excel_cantik(st.session_state.master_coa, FILE_MASTER_COA, 'Master_COA')
-                    st.success("Akun berhasil ditambahkan!")
+                    st.success("Akun berhasil ditambahkan & disimpan permanen!")
                     st.rerun()
                 else:
                     st.error("Lengkapi Nomor dan Nama Akun.")
@@ -419,7 +422,7 @@ def render_modul_0():
                     df_bu_clean = df_bu_clean[df_bu_clean['Kode BU'] != ""]
                     st.session_state.master_bu = df_bu_clean.reset_index(drop=True)
                     simpan_excel_cantik(st.session_state.master_bu, FILE_MASTER_BU, 'Master_BU')
-                    st.success("Master BU berhasil diimpor!")
+                    st.success("Master BU berhasil diimpor & disimpan permanen!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Gagal: {e}")
