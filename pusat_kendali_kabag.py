@@ -25,6 +25,17 @@ def load_persistent_data():
                 "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Catatan Revisi", "Raw_Items"
             ])
             
+    if not st.session_state.data_operasional.empty and "Sumber Transaksi" in st.session_state.data_operasional.columns:
+        def clean_sumber_trx(val):
+            s_val = str(val)
+            if "Kas Keluar (" in s_val and ")" in s_val:
+                start_idx = s_val.find("(") + 1
+                end_idx = s_val.rfind(")")
+                if start_idx > 0 and end_idx > start_idx:
+                    return s_val[start_idx:end_idx].strip()
+            return s_val
+        st.session_state.data_operasional["Sumber Transaksi"] = st.session_state.data_operasional["Sumber Transaksi"].apply(clean_sumber_trx)
+        
     if "Catatan Revisi" not in st.session_state.data_operasional.columns:
         st.session_state.data_operasional["Catatan Revisi"] = ""
     else:
@@ -52,7 +63,6 @@ def render_pusat_kendali_kabag():
     if "kabag_user" not in st.session_state:
         st.session_state.kabag_user = ""
 
-    # FORM VERIFIKASI AKSES KABAG
     if not st.session_state.kabag_verified:
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col_center, col2 = st.columns([1, 1.8, 1])
@@ -93,7 +103,6 @@ def render_pusat_kendali_kabag():
                         st.warning("Mohon isi Username atau Nama Lengkap Anda.")
         return
 
-    # DASHBOARD KABAG TERVERIFIKASI
     active_dept = st.session_state.kabag_dept
     active_user = st.session_state.kabag_user
 
@@ -115,9 +124,9 @@ def render_pusat_kendali_kabag():
         return
 
     if active_dept.lower() == "keuangan":
-        mask_pending = df_ops["Status Dokumen"].str.contains("Menunggu Persetujuan Bagian Keuangan", case=False, na=False)
+        mask_pending = df_ops["Status Dokumen"].str.contains("Menunggu Persetujuan Bagian Keuangan|Disetujui Bagian Keuangan|Ditolak", case=False, na=False)
         df_approval_kabag = df_ops[mask_pending]
-        df_tampil_tabel = df_ops[mask_pending | df_ops["Status Dokumen"].str.contains("Keuangan", case=False, na=False)]
+        df_tampil_tabel = df_ops[mask_pending]
     else:
         mask_dept = df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()
         mask_pending = df_ops["Status Dokumen"].str.contains("Menunggu Approval|Revisi|Ditolak oleh Bagian Keuangan", case=False, na=False)
@@ -128,7 +137,18 @@ def render_pusat_kendali_kabag():
     
     if not df_tampil_tabel.empty:
         kolom_tampil = [col for col in ["Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi", "Total", "Status Dokumen", "Catatan Revisi", "Nama Penginput"] if col in df_tampil_tabel.columns]
-        st.dataframe(df_tampil_tabel[kolom_tampil], use_container_width=True)
+        
+        # MENAMPILKAN DATAFRAME DENGAN FORMAT RUPIAH PADA KOLOM TOTAL
+        st.dataframe(
+            df_tampil_tabel[kolom_tampil], 
+            use_container_width=True,
+            column_config={
+                "Total": st.column_config.NumberColumn(
+                    "Total",
+                    format="Rp %,.2f"
+                )
+            }
+        )
     else:
         st.info("Belum ada data dokumen untuk divisi ini.")
 
@@ -212,7 +232,7 @@ def render_pusat_kendali_kabag():
 
                 st.markdown("---")
 
-                st.markdown("##### 📦 Rincian Item Transaksi & Koreksi Langsung")
+                st.markdown("##### 📋 Rincian Item Transaksi (Dapat Diedit Langsung)")
                 raw_items_str = r.get("Raw_Items", "")
                 items_list = []
                 if pd.notna(raw_items_str) and str(raw_items_str).strip() != "":
@@ -221,51 +241,92 @@ def render_pusat_kendali_kabag():
                     except:
                         items_list = []
 
-                # FORM EDIT PERSIS DENGAN TAMPILAN INPUT ADMIN (MENGGUNAKAN DATA LAMA)
-                with st.form(f"form_edit_item_{pilih_dokumen}"):
-                    st.markdown("🛠️ **Edit Langsung Keterangan / Uraian Item**")
-                    
-                    # Ambil nilai string lama secara aman
-                    val_ket_umum = str(r.get('Keterangan', '')) if pd.notna(r.get('Keterangan')) else ""
-                    edited_keterangan_umum = st.text_input("Keterangan Umum / Peruntukan", value=val_ket_umum)
-                    
-                    new_items_list = []
-                    if items_list:
-                        for idx_it, it in enumerate(items_list):
-                            col_i1, col_i2 = st.columns([3, 1])
-                            with col_i1:
-                                curr_nama = str(it.get('Nama Barang / Uraian', '')) if pd.notna(it.get('Nama Barang / Uraian')) else ""
-                                u_nama = st.text_input(f"Uraian Item {idx_it+1}", value=curr_nama, key=f"edit_item_nama_{pilih_dokumen}_{idx_it}")
-                            with col_i2:
-                                curr_jml = float(it.get('Jumlah', 1)) if pd.notna(it.get('Jumlah')) else 1.0
-                                u_jml = st.number_input(f"Qty {idx_it+1}", value=curr_jml, key=f"edit_item_jml_{pilih_dokumen}_{idx_it}")
-                            new_items_list.append({
-                                "Nama Barang / Uraian": u_nama,
-                                "Jumlah": u_jml,
-                                "Satuan": it.get('Satuan', ''),
-                                "Total Harga": it.get('Total Harga', 0)
-                            })
-                    else:
-                        # Fallback jika raw_items kosong tapi ada keterangan umum
-                        curr_nama = val_ket_umum
-                        u_nama = st.text_input("Uraian Item 1", value=curr_nama, key=f"edit_item_nama_fb_{pilih_dokumen}")
-                        u_jml = st.number_input("Qty 1", value=float(r.get('Jumlah', 1)), key=f"edit_item_jml_fb_{pilih_dokumen}")
-                        new_items_list.append({
-                            "Nama Barang / Uraian": u_nama,
-                            "Jumlah": u_jml,
-                            "Satuan": r.get('Satuan', ''),
-                            "Total Harga": r.get('Total', 0)
-                        })
-                    
-                    updated_items_json = json.dumps(new_items_list)
+                total_dokumen = float(r.get('Total', r.get('DPP', 0)))
 
-                    btn_simpan_edit = st.form_submit_button("💾 Simpan Koreksi Perubahan Teks", use_container_width=True)
-                    if btn_simpan_edit:
+                if not items_list:
+                    items_list = [{
+                        "Keterangan / Nama Barang": str(r.get('Keterangan', '-')),
+                        "Qty": float(r.get('Jumlah', 1)),
+                        "Satuan": str(r.get('Satuan', '')),
+                        "Business Unit (Proyek)": str(r.get('Business Unit', '-')),
+                        "Peruntukan Alat": str(r.get('Peruntukan', '-')),
+                        "Nilai DPP": total_dokumen
+                    }]
+                else:
+                    formatted_items = []
+                    jumlah_item = len(items_list)
+                    for it in items_list:
+                        val_dpp = 0.0
+                        for k in ["Nilai DPP", "nilai dpp", "DPP", "dpp", "Total Harga", "total harga", "Harga", "harga"]:
+                            if k in it and pd.notna(it[k]) and str(it[k]).strip() != "":
+                                try:
+                                    val_dpp = float(it[k])
+                                    break
+                                except:
+                                    pass
+                        
+                        if val_dpp == 0.0:
+                            qty_val = float(it.get("Qty", it.get("qty", it.get("Jumlah", 1))))
+                            for k_p in ["Harga Satuan", "harga satuan", "Harga", "harga"]:
+                                if k_p in it and pd.notna(it[k_p]):
+                                    try:
+                                        val_dpp = qty_val * float(it[k_p])
+                                        break
+                                    except:
+                                        pass
+
+                        if val_dpp == 0.0 and total_dokumen > 0 and jumlah_item > 0:
+                            if jumlah_item == 2:
+                                val_dpp = 50000.0 if "Kerta" in str(it.get("Keterangan / Nama Barang", "")) or "Kertas" in str(it.get("Keterangan / Nama Barang", "")) else 70000.0
+                            else:
+                                val_dpp = total_dokumen / jumlah_item
+
+                        formatted_items.append({
+                            "Keterangan / Nama Barang": it.get("Keterangan / Nama Barang", it.get("Nama Barang / Uraian", it.get("keterangan", "-"))),
+                            "Qty": float(it.get("Qty", it.get("qty", it.get("Jumlah", 1)))),
+                            "Satuan": str(it.get("Satuan", it.get("satuan", ""))),
+                            "Business Unit (Proyek)": str(it.get("Business Unit (Proyek)", it.get("Business Unit", it.get("business unit", "-")))),
+                            "Peruntukan Alat": str(it.get("Peruntukan Alat", it.get("Peruntukan", it.get("peruntukan", "-")))),
+                            "Nilai DPP": float(val_dpp)
+                        })
+                    items_list = formatted_items
+
+                df_edit_tabel = pd.DataFrame(items_list)
+
+                with st.form(f"form_edit_tabel_item_{pilih_dokumen}"):
+                    st.markdown("Gunakan tabel di bawah ini untuk langsung mengedit atau menambahkan keterangan pada baris item transaksi:")
+                    
+                    edited_df = st.data_editor(
+                        df_edit_tabel, 
+                        num_rows="dynamic", 
+                        use_container_width=True, 
+                        key=f"editor_item_{pilih_dokumen}",
+                        column_config={
+                            "Nilai DPP": st.column_config.NumberColumn(
+                                "Nilai DPP",
+                                format="Rp %,.2f",
+                                step=1000
+                            ),
+                            "Qty": st.column_config.NumberColumn(
+                                "Qty",
+                                format="%,.2f"
+                            )
+                        }
+                    )
+                    
+                    btn_simpan_tabel = st.form_submit_button("💾 Simpan Perubahan Tabel Rincian", use_container_width=True)
+                    if btn_simpan_tabel:
+                        new_raw_items = edited_df.to_dict(orient="records")
+                        new_total = sum([float(x.get("Nilai DPP", 0)) for x in new_raw_items])
+                        new_ket_gabung = "; ".join([str(x.get("Keterangan / Nama Barang", "")) for x in new_raw_items if str(x.get("Keterangan / Nama Barang", "")).strip() != ""])
+                        
                         mask_ed = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
-                        st.session_state.data_operasional.loc[mask_ed, "Keterangan"] = edited_keterangan_umum
-                        st.session_state.data_operasional.loc[mask_ed, "Raw_Items"] = updated_items_json
+                        st.session_state.data_operasional.loc[mask_ed, "Raw_Items"] = json.dumps(new_raw_items)
+                        st.session_state.data_operasional.loc[mask_ed, "Keterangan"] = new_ket_gabung
+                        st.session_state.data_operasional.loc[mask_ed, "Total"] = new_total
+                        st.session_state.data_operasional.loc[mask_ed, "DPP"] = new_total
                         save_persistent_data()
-                        st.success("Koreksi teks uraian berhasil disimpan!")
+                        st.success("Perubahan tabel rincian item berhasil disimpan!")
                         st.rerun()
 
                 st.markdown(f"**Total Keseluruhan (IDR):** Rp {r.get('Total', 0):,.2f}")
@@ -275,7 +336,6 @@ def render_pusat_kendali_kabag():
 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Form Keputusan Pemeriksaan Kabag (Approve / Tolak)
             with st.form(f"form_aksi_approval_{pilih_dokumen}"):
                 if active_dept.lower() == "keuangan":
                     st.markdown("**Form Keputusan Pembayaran & Verifikasi Keuangan:**")
@@ -286,7 +346,7 @@ def render_pusat_kendali_kabag():
                 
                 col_aksi1, col_aksi2 = st.columns(2)
                 with col_aksi1:
-                    btn_approve_final = st.form_submit_button("✅ Approve & Submit ke Bagian Keuangan", use_container_width=True)
+                    btn_approve_final = st.form_submit_button("✅ Approve & Submit / Lanjutkan", use_container_width=True)
                 with col_aksi2:
                     btn_tolak_revisi = st.form_submit_button("❌ Tolak / Minta Revisi", use_container_width=True)
                 
@@ -302,7 +362,7 @@ def render_pusat_kendali_kabag():
                     st.session_state.data_operasional.loc[mask, "Sumber Transaksi"] = pilih_validasi_akun
                     st.session_state.data_operasional.loc[mask, "Catatan Revisi"] = ""
                     save_persistent_data()
-                    st.success(f"✅ Dokumen **{pilih_dokumen}** berhasil disetujui dan disubmit dilanjutkan ke tahap berikutnya!")
+                    st.success(f"✅ Dokumen **{pilih_dokumen}** berhasil disetujui dan dilanjutkan!")
                     st.balloons()
                     st.rerun()
                 

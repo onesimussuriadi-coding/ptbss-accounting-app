@@ -7,7 +7,6 @@ import streamlit as st
 EXCEL_DB_PATH = "database_transaksi_bss.xlsx"
 
 def load_persistent_data():
-    """Memuat data transaksi secara permanen dari file Excel tanpa modifikasi otomatis."""
     if "data_operasional" not in st.session_state:
         if os.path.exists(EXCEL_DB_PATH):
             try:
@@ -27,17 +26,30 @@ def load_persistent_data():
                 "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Catatan Revisi", "Raw_Items"
             ])
             
-    # Normalisasi format Tanggal agar aman dari error Arrow type conversion
+    if not st.session_state.data_operasional.empty and "Sumber Transaksi" in st.session_state.data_operasional.columns:
+        def clean_sumber_trx(val):
+            s_val = str(val)
+            if "Kas Keluar (" in s_val and ")" in s_val:
+                start_idx = s_val.find("(") + 1
+                end_idx = s_val.rfind(")")
+                if start_idx > 0 and end_idx > start_idx:
+                    return s_val[start_idx:end_idx].strip()
+            return s_val
+
+        st.session_state.data_operasional["Sumber Transaksi"] = st.session_state.data_operasional["Sumber Transaksi"].apply(clean_sumber_trx)
+        
+    if "Catatan Revisi" not in st.session_state.data_operasional.columns:
+        st.session_state.data_operasional["Catatan Revisi"] = ""
+    else:
+        st.session_state.data_operasional["Catatan Revisi"] = st.session_state.data_operasional["Catatan Revisi"].astype(str).fillna("")
+
+    if "Raw_Items" not in st.session_state.data_operasional.columns:
+        st.session_state.data_operasional["Raw_Items"] = ""
+    
     if not st.session_state.data_operasional.empty and "Tanggal" in st.session_state.data_operasional.columns:
         st.session_state.data_operasional["Tanggal"] = pd.to_datetime(st.session_state.data_operasional["Tanggal"], errors='coerce').dt.strftime('%Y-%m-%d').fillna("-")
 
-    if "Catatan Revisi" not in st.session_state.data_operasional.columns:
-        st.session_state.data_operasional["Catatan Revisi"] = ""
-    if "Raw_Items" not in st.session_state.data_operasional.columns:
-        st.session_state.data_operasional["Raw_Items"] = ""
-
 def save_persistent_data():
-    """Menyimpan data secara permanen ke file Excel."""
     try:
         st.session_state.data_operasional.to_excel(EXCEL_DB_PATH, index=False)
     except Exception as e:
@@ -139,18 +151,24 @@ def render_modul_1():
         st.markdown(f"<p style='font-size:12px; color:#64748B;'>Pengguna: <b>{penginput_saat_ini}</b></p>", unsafe_allow_html=True)
         menu_data_tersimpan = st.toggle("📂 Kelola / Lihat Data Tersimpan", value=False, key="toggle_kelola_data")
 
-    # Pembacaan Master COA akun kas berawalan "111"
-    list_kas_111 = []
+    # PENGATURAN AKUN SUMBER (KODE 111 UNTUK KAS & KODE 117 UNTUK PERSEDIAAN KHUSUS LOGISTIK)
+    list_sumber_opsi = []
     if os.path.exists("master_coa_bss.xlsx"):
         try:
             df_coa = pd.read_excel("master_coa_bss.xlsx")
             df_coa.columns = df_coa.columns.str.replace("\xa0", " ").str.strip()
             col_kode = df_coa.columns[0]
             col_nama = df_coa.columns[1] if len(df_coa.columns) > 1 else df_coa.columns[0]
-            mask_111 = df_coa[col_kode].astype(str).str.startswith("111")
-            df_filtered = df_coa[mask_111]
+            
+            if str(dept_saat_ini).strip().lower() == "logistik":
+                mask_111_117 = df_coa[col_kode].astype(str).str.startswith(("111", "117"))
+                df_filtered = df_coa[mask_111_117]
+            else:
+                mask_111 = df_coa[col_kode].astype(str).str.startswith("111")
+                df_filtered = df_coa[mask_111]
+
             if not df_filtered.empty:
-                list_kas_111 = (
+                list_sumber_opsi = (
                     df_filtered[col_kode].astype(str).str.strip()
                     + " - "
                     + df_filtered[col_nama].astype(str).str.strip()
@@ -158,16 +176,24 @@ def render_modul_1():
         except Exception:
             pass
 
-    if not list_kas_111:
-        list_kas_111 = [
-            "1110.001 - Kas Besar Luwuk",
-            "1110.002 - Kas Operasional Surabaya",
-            "1110.003 - Kas Operasional Jakarta",
-            "1110.012 - Kas Kecil",
-            "1110.013 - Kas Proyek CR Umum",
-            "1110.014 - Kas Proyek GS Umum",
-            "1110.031 - Kas Top Up Tiket Pesawat"
-        ]
+    if not list_sumber_opsi:
+        if str(dept_saat_ini).strip().lower() == "logistik":
+            list_sumber_opsi = [
+                "1110.001 - Kas Besar Luwuk",
+                "1110.012 - Kas Kecil",
+                "1170.001 - Persediaan Barang Gudang Utama",
+                "1170.002 - Persediaan Material Proyek"
+            ]
+        else:
+            list_sumber_opsi = [
+                "1110.001 - Kas Besar Luwuk",
+                "1110.002 - Kas Operasional Surabaya",
+                "1110.003 - Kas Operasional Jakarta",
+                "1110.012 - Kas Kecil",
+                "1110.013 - Kas Proyek CR Umum",
+                "1110.014 - Kas Proyek GS Umum",
+                "1110.031 - Kas Top Up Tiket Pesawat"
+            ]
 
     if menu_data_tersimpan:
         st.markdown("## 📋 Dashboard Manajemen & Distribusi Dokumen")
@@ -189,7 +215,17 @@ def render_modul_1():
                 col for col in ["Nomor Bukti", "Sumber Transaksi", "Total", "Status Dokumen", "Catatan Revisi", "Tanggal"]
                 if col in df_user_milik_sendiri.columns
             ]
-            st.dataframe(df_user_milik_sendiri[kolom_tampil], use_container_width=True)
+            
+            st.dataframe(
+                df_user_milik_sendiri[kolom_tampil], 
+                use_container_width=True,
+                column_config={
+                    "Total": st.column_config.NumberColumn(
+                        "Total",
+                        format="Rp %,.2f"
+                    )
+                }
+            )
 
             df_revisi_check = df_user_milik_sendiri[
                 df_user_milik_sendiri["Status Dokumen"].str.contains("Ditolak|Revisi", case=False, na=False)
@@ -267,20 +303,13 @@ def render_modul_1():
     edit_data = st.session_state.get("edit_data_temp", {})
 
     if role_aktif == "Programmer":
-        list_sumber_opsi = list_kas_111 + [
+        list_sumber_opsi += [
             "Tagihan / Pembelian Kredit (Hutang Usaha)",
             "Gudang",
             "Kas Bank Masuk (Penerimaan Dana)",
             "Penerbitan Invoice / Tagihan Penjualan (Piutang Usaha)",
             "Memorial / Koreksi",
         ]
-    elif dept_saat_ini == "Logistik":
-        list_sumber_opsi = list_kas_111 + [
-            "Tagihan / Pembelian Kredit (Hutang Usaha)",
-            "Gudang",
-        ]
-    else:
-        list_sumber_opsi = list_kas_111
 
     if is_edit_mode:
         st.warning(f"⚠️ **MODE EDIT AKTIF (No. Bukti: {edit_data.get('Nomor Bukti')})**: Sumber akun disesuaikan otomatis mengikuti data yang dipanggil.")
@@ -312,15 +341,16 @@ def render_modul_1():
 
     st.markdown("---")
 
+    # LOGIKA PEMILIHAN MODUL BERDASARKAN AKUN SUMBER (KAS 111 / PERSEDIAAN 117 / GUDANG)
     if sumber_transaksi == "Tagihan / Pembelian Kredit (Hutang Usaha)":
         render_pembelian_kredit()
     elif sumber_transaksi == "Penerbitan Invoice / Tagihan Penjualan (Piutang Usaha)":
         render_invoice_penjualan()
     elif sumber_transaksi == "Kas Bank Masuk (Penerimaan Dana)":
         render_kas_bank_masuk()
-    elif sumber_transaksi in list_kas_111 or sumber_transaksi.startswith("111"):
-        render_kas_bank_keluar()
-    elif sumber_transaksi == "Gudang":
+    elif sumber_transaksi.startswith("117") or "Persediaan" in sumber_transaksi or sumber_transaksi == "Gudang":
         render_gudang_persediaan()
+    elif sumber_transaksi.startswith("111") or "Kas" in sumber_transaksi:
+        render_kas_bank_keluar()
     elif sumber_transaksi == "Memorial / Koreksi":
         render_memorial_koreksi()
