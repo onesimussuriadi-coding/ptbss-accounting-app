@@ -1,0 +1,182 @@
+import os
+import pandas as pd
+import streamlit as st
+
+EXCEL_DB_PATH = "database_transaksi_bss.xlsx"
+
+def load_persistent_data():
+    if "data_operasional" not in st.session_state:
+        if os.path.exists(EXCEL_DB_PATH):
+            try:
+                st.session_state.data_operasional = pd.read_excel(EXCEL_DB_PATH)
+            except Exception:
+                st.session_state.data_operasional = pd.DataFrame(columns=[
+                    "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+                    "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+                    "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+                    "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+                ])
+        else:
+            st.session_state.data_operasional = pd.DataFrame(columns=[
+                "Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi",
+                "No Invoice", "Jatuh Tempo", "Business Unit", "Departemen Tujuan",
+                "Jumlah", "Satuan", "Peruntukan", "Keterangan", "DPP", "PPN", "PPH",
+                "Total", "Status Dokumen", "Status Jurnal", "Nama Penginput", "Raw_Items"
+            ])
+
+def save_persistent_data():
+    try:
+        st.session_state.data_operasional.to_excel(EXCEL_DB_PATH, index=False)
+    except Exception as e:
+        st.error(f"Gagal menyimpan ke file permanen: {e}")
+
+def render_pusat_kendali_kabag():
+    load_persistent_data()
+
+    # Inisialisasi session state untuk verifikasi akses kabag
+    if "kabag_verified" not in st.session_state:
+        st.session_state.kabag_verified = False
+    if "kabag_active_dept" not in st.session_state:
+        st.session_state.kabag_active_dept = ""
+    if "kabag_active_user" not in st.session_state:
+        st.session_state.kabag_active_user = ""
+
+    user_role = st.session_state.get("user_role", "Kabag")
+    user_default_dept = st.session_state.get("user_dept", "Operasional")
+    user_fullname = st.session_state.get("user_name", st.session_state.get("authenticated_user", ""))
+
+    # Jika belum terverifikasi, tampilkan form verifikasi akses seperti Modul 1
+    if not st.session_state.kabag_verified:
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col_form, col2 = st.columns([1, 1.5, 1])
+        
+        with col_form:
+            st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🔐 Verifikasi Akses Pusat Kendali Kabag</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: #64748B; font-size: 14px;'>Silakan pilih departemen wewenang dan konfirmasikan identitas Anda.</p>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            with st.form("form_verifikasi_kabag"):
+                daftar_dept = [
+                    "Operasional",
+                    "HRD",
+                    "Logistik",
+                    "Maintenance",
+                    "HSE",
+                    "Keuangan",
+                    "Akuntansi",
+                    "Manajemen"
+                ]
+                
+                # Coba tentukan indeks default departemen user jika ada di list
+                default_idx = 0
+                if user_default_dept in daftar_dept:
+                    default_idx = daftar_dept.index(user_default_dept)
+
+                pilih_dept = st.selectbox("Departemen Wewenang", daftar_dept, index=default_idx)
+                input_nama_kabag = st.text_input("Username / Nama Lengkap Kabag", value=user_fullname, placeholder="Ketik nama atau username...")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                btn_masuk_kendali = st.form_submit_button("🚀 Masuk ke Pusat Kendali", use_container_width=True)
+                
+                if btn_masuk_kendali:
+                    if input_nama_kabag.strip() != "":
+                        st.session_state.kabag_verified = True
+                        st.session_state.kabag_active_dept = pilih_dept
+                        st.session_state.kabag_active_user = input_nama_kabag.strip()
+                        st.success(f"Verifikasi Berhasil! Memuat panel kendali departemen {pilih_dept}...")
+                        st.rerun()
+                    else:
+                        st.warning("Silakan masukkan nama atau username Anda terlebih dahulu.")
+        return
+
+    # =========================================================================
+    # JIKA SUDAH TERVERIFIKASI, TAMPILKAN DASHBOARD KENDALI & APPROVAL
+    # =========================================================================
+    active_dept = st.session_state.kabag_active_dept
+    active_user = st.session_state.kabag_active_user
+
+    col_atas1, col_atas2 = st.columns([3, 1])
+    with col_atas1:
+        st.subheader(f"📂 Pusat Kendali & Approval Berjenjang ({active_dept})")
+        st.markdown(f"<p style='color: #475569;'>Kepala Bagian Aktif: <b>{active_user}</b> | Wewenang Divisi: <b>{active_dept}</b></p>", unsafe_allow_html=True)
+    
+    with col_atas2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Ganti Departemen / Akun", use_container_width=True):
+            st.session_state.kabag_verified = False
+            st.rerun()
+
+    st.markdown("---")
+
+    if "data_operasional" not in st.session_state or st.session_state.data_operasional.empty:
+        st.info("ℹ️ Belum ada data dokumen operasional yang tersimpan di sistem.")
+        return
+
+    df_ops = st.session_state.data_operasional
+
+    # Filter dokumen khusus untuk departemen Kabag yang dipilih saat verifikasi
+    if "Status Dokumen" in df_ops.columns and "Departemen Tujuan" in df_ops.columns:
+        df_approval_kabag = df_ops[
+            (
+                df_ops["Status Dokumen"].str.contains(f"Kepala Bagian {active_dept}", case=False, na=False) |
+                df_ops["Status Dokumen"].str.contains(f"Menunggu Approval.*{active_dept}", case=False, na=False)
+            ) & 
+            (
+                df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()
+            )
+        ]
+    else:
+        df_approval_kabag = pd.DataFrame(columns=df_ops.columns)
+
+    if df_approval_kabag.empty:
+        st.success(f"🎉 Tidak ada dokumen pending yang menunggu approval untuk Divisi **{active_dept}** saat ini.")
+        
+        st.markdown("---")
+        st.markdown(f"### 📚 Riwayat Dokumen Masuk Divisi {active_dept}")
+        if "Departemen Tujuan" in df_ops.columns:
+            df_riwayat = df_ops[df_ops["Departemen Tujuan"].str.lower() == active_dept.lower()]
+            if not df_riwayat.empty:
+                kolom_riwayat = [c for c in ["Nomor Bukti", "Sumber Transaksi", "Total", "Status Dokumen", "Tanggal", "Nama Penginput"] if c in df_riwayat.columns]
+                st.dataframe(df_riwayat[kolom_riwayat], use_container_width=True)
+        return
+
+    st.markdown(f"### 📋 Daftar Dokumen Masuk Pending Approval ({active_dept})")
+    
+    kolom_tampil = [
+        col for col in ["Nomor Bukti", "Tanggal", "Sumber Transaksi", "Lawan Transaksi", "Total", "Status Dokumen", "Nama Penginput"]
+        if col in df_approval_kabag.columns
+    ]
+    st.dataframe(df_approval_kabag[kolom_tampil], use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("### ✍️ Panel Aksi Verifikasi & Approval Kabag")
+    
+    list_nomor_bukti = df_approval_kabag["Nomor Bukti"].tolist()
+    
+    col_pilih, col_app, col_tolak = st.columns([2, 1, 1])
+    with col_pilih:
+        pilih_dokumen = st.selectbox("Pilih Nomor Bukti Dokumen", ["-- Pilih Nomor Bukti --"] + list_nomor_bukti, key=f"sel_approval_kabag_{active_dept}")
+    
+    with col_app:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✅ Approve Dokumen", use_container_width=True, key=f"btn_app_{active_dept}"):
+            if pilih_dokumen != "-- Pilih Nomor Bukti --":
+                mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
+                st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Disetujui Kabag {active_dept} - Menunggu Verifikasi Akuntansi"
+                save_persistent_data()
+                st.success(f"Dokumen **{pilih_dokumen}** berhasil di-Approve dan diteruskan ke bagian Akuntansi!")
+                st.rerun()
+            else:
+                st.warning("Pilih Nomor Bukti dokumen.")
+
+    with col_tolak:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("❌ Tolak / Revisi", use_container_width=True, key=f"btn_tolak_{active_dept}"):
+            if pilih_dokumen != "-- Pilih Nomor Bukti --":
+                mask = st.session_state.data_operasional["Nomor Bukti"] == pilih_dokumen
+                st.session_state.data_operasional.loc[mask, "Status Dokumen"] = f"Ditolak Kabag {active_dept} (Perlu Revisi)"
+                save_persistent_data()
+                st.error(f"Dokumen **{pilih_dokumen}** ditolak dan dikembalikan ke staf.")
+                st.rerun()
+            else:
+                st.warning("Pilih Nomor Bukti dokumen.")
